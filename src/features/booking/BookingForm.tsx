@@ -1,0 +1,132 @@
+'use client';
+
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
+import { Icon } from '@/components/Icon';
+import { manicureOptions, periods, services, salon, type ServiceId } from '@/content/salon';
+import { isAllowedDay, readableDay, todayInTehran } from '@/lib/jalali';
+import { isUpcomingPeriod, selectionErrors, validateSubmission, whatsappRequestUrl, type BookingRequest } from './model';
+import { JalaliCalendar } from './JalaliCalendar';
+
+export function BookingForm({ today, initialNow, serverEnabled }: { today: string; initialNow: string; serverEnabled: boolean }) {
+  const [step, setStep] = useState(0);
+  const [currentToday, setCurrentToday] = useState(today);
+  const [clockNow, setClockNow] = useState(() => new Date(initialNow));
+  const [data, setData] = useState<BookingRequest>({ name: '', phone: '', service: 'manicure', manicureType: '', date: '', period: '', note: '', consent: false });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [reference, setReference] = useState('');
+  const [useWhatsapp, setUseWhatsapp] = useState(!serverEnabled);
+  const token = useRef<string | null>(null);
+  const formHeading = useRef<HTMLHeadingElement>(null);
+  const previousStep = useRef(0);
+
+  useEffect(() => {
+    if (previousStep.current === step) return;
+    previousStep.current = step;
+    formHeading.current?.focus();
+    formHeading.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }, [step]);
+
+  useEffect(() => {
+    const select = (event: Event) => { if (pending || saved) return; const service = (event as CustomEvent).detail as ServiceId; if (services.some(item => item.id === service)) { setData(current => ({ ...current, service, manicureType: service === 'manicure' ? current.manicureType : '' })); setErrors({}); token.current = null; setStep(0); } };
+    window.addEventListener('select-service', select);
+    return () => window.removeEventListener('select-service', select);
+  }, [pending, saved]);
+
+  useEffect(() => {
+    function refresh() { const now = new Date(); setCurrentToday(todayInTehran(now)); setClockNow(now); }
+    refresh();
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    const timer = window.setInterval(refresh, 60000);
+    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); window.clearInterval(timer); };
+  }, []);
+
+  function change<K extends keyof BookingRequest>(key: K, value: BookingRequest[K]) {
+    if (pending || saved) return;
+    setData(current => { const next = { ...current, [key]: value }; if (key === 'service' && value === 'pedicure') next.manicureType = ''; return next; });
+    setErrors(current => { const next = { ...current }; delete next[key]; delete next.form; if (key === 'service') delete next.manicureType; if (key === 'date') delete next.period; return next; });
+    token.current = null;
+  }
+
+  function nextStep() {
+    const now = new Date();
+    setCurrentToday(todayInTehran(now)); setClockNow(now);
+    const problems = selectionErrors(data, now);
+    if (Object.keys(problems).length) { setErrors(problems); formHeading.current?.focus(); formHeading.current?.scrollIntoView({ block: 'start', behavior: 'instant' }); return; }
+    setErrors({}); setStep(1);
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (pending || saved) return;
+    setCurrentToday(todayInTehran());
+    const result = validateSubmission(data);
+    if (!result.success) { setErrors(result.errors); if (result.errors.date || result.errors.period || result.errors.manicureType) setStep(0); return; }
+    setData(result.data);
+    if (useWhatsapp) { setSaved(false); setStep(2); return; }
+    setPending(true); setErrors({});
+    try {
+      token.current ??= crypto.randomUUID();
+      const response = await fetch('/api/appointment-requests', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': token.current }, body: JSON.stringify(result.data) });
+      const body = await response.json();
+      if (!response.ok) { setErrors(body.errors ?? { form: body.message ?? 'ثبت درخواست انجام نشد. دوباره تلاش کن یا در واتس‌اپ پیام بده.' }); if (body.errors?.date || body.errors?.period || body.errors?.manicureType) { setStep(0); setCurrentToday(todayInTehran()); setClockNow(new Date()); } setUseWhatsapp(response.status === 503); return; }
+      setReference(body.reference); setSaved(true); setStep(2);
+    } catch { setErrors({ form: 'ارتباط برقرار نشد. اطلاعاتت همین‌جا مانده؛ می‌توانی آن را در واتس‌اپ بفرستی.' }); setUseWhatsapp(true); }
+    finally { setPending(false); }
+  }
+
+  function openWhatsapp(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (saved) return;
+    const now = new Date();
+    const result = validateSubmission(data, now);
+    if (result.success) return;
+    event.preventDefault();
+    setCurrentToday(todayInTehran(now)); setClockNow(now); setErrors(result.errors);
+    setStep(result.errors.date || result.errors.period || result.errors.manicureType ? 0 : 1);
+  }
+
+  if (step === 2) return <div className="booking-sheet booking-result" role="region" aria-labelledby="booking-result-title">
+    <span className="result-mark"><Icon name="check" size={30} /></span>
+    <h3 id="booking-result-title" ref={formHeading} tabIndex={-1}>{saved ? 'درخواستت ثبت شد.' : 'پیامت آمادهٔ ارسال است.'}</h3>
+    <p>{saved ? 'برای هماهنگی زمان دقیق با تو تماس می‌گیریم. این پیام، تأیید نهایی نوبت نیست.' : 'روی دکمهٔ زیر بزن و پیام آماده‌شده را در واتس‌اپ بفرست. بعد از هماهنگی با تینا، نوبتت نهایی می‌شود.'}</p>
+    <dl className="request-summary">
+      <div><dt>خدمت</dt><dd>{services.find(item => item.id === data.service)!.name}</dd></div>
+      {data.service === 'manicure' && <div><dt>نوع مانیکور</dt><dd>{manicureOptions.find(item => item.id === data.manicureType)?.label}</dd></div>}
+      <div><dt>روز دلخواه</dt><dd>{readableDay(data.date)}</dd></div>
+      <div><dt>ساعت</dt><dd>{periods.find(item => item.id === data.period)?.label}</dd></div>
+      {reference && <div><dt>کد پیگیری</dt><dd dir="ltr">{reference}</dd></div>}
+    </dl>
+    <a className="button primary full booking-cta" onClick={openWhatsapp} onAuxClick={openWhatsapp} href={saved ? `${salon.whatsapp}?text=${encodeURIComponent(`سلام تینا، برای پیگیری یا اصلاح درخواست با کد ${reference} پیام می‌دهم.`)}` : whatsappRequestUrl(data)} target="_blank" rel="noopener noreferrer"><Icon name="whatsapp" />{saved ? 'پیگیری یا اصلاح درخواست در واتس‌اپ' : 'ارسال درخواست در واتس‌اپ'}</a>
+    {!saved && <button className="text-button" type="button" onClick={() => setStep(1)}>ویرایش اطلاعات</button>}
+  </div>;
+
+  return <form className="booking-sheet" onSubmit={submit} noValidate>
+    <div className="form-heading"><h3 ref={formHeading} tabIndex={-1}>{step === 0 ? 'وقت دلخواهت را انتخاب کن' : 'چطور با تو هماهنگ کنیم؟'}</h3><span>{step === 0 ? 'خدمت، روز و ساعت' : 'اطلاعات تماس'}</span></div>
+    <div className="form-progress" aria-hidden="true"><span className="complete" /><span className={step === 1 ? 'complete' : ''} /></div>
+    <p className="sr-only" role="alert">{Object.values(errors).join(' ')}</p>
+    <fieldset disabled={pending} aria-busy={pending} className="booking-fields">
+    {step === 0 ? <>
+      <fieldset className="service-choice"><legend>برای چه خدمتی؟</legend><div className="choice-row">{services.map(item => <label className={data.service === item.id ? 'choice selected' : 'choice'} key={item.id}><input type="radio" name="service" value={item.id} checked={data.service === item.id} onChange={() => change('service', item.id)} />{item.name}</label>)}</div></fieldset>
+      {data.service === 'manicure' && <fieldset className="manicure-choice" aria-describedby={errors.manicureType ? 'manicure-error' : undefined}><legend>ژلیش یا کاشت؟</legend><div className="choice-row">{manicureOptions.map(item => <label className={data.manicureType === item.id ? 'choice selected' : 'choice'} key={item.id}><input type="radio" name="manicureType" value={item.id} checked={data.manicureType === item.id} onChange={() => change('manicureType', item.id)} />{item.label}</label>)}</div>{errors.manicureType && <p className="field-error" id="manicure-error">{errors.manicureType}</p>}</fieldset>}
+      <JalaliCalendar today={currentToday} selected={data.date} onSelect={key => change('date', key)} />
+      {errors.date && <p className="field-error" role="alert">{errors.date}</p>}
+      <fieldset className="period-choice" aria-describedby={errors.period ? 'period-error' : 'period-hint'}><legend>چه ساعتی؟ <span className="duration-note">هر نوبت ۲ ساعت</span></legend><div className="time-grid">{periods.map(item => <label className={data.period === item.id ? 'choice time-choice selected' : 'choice time-choice'} key={item.id}><input type="radio" name="period" value={item.id} aria-label={`ساعت ${item.label}`} checked={data.period === item.id} disabled={!isUpcomingPeriod(data.date, item.id, clockNow)} onChange={() => change('period', item.id)} /><Icon name="calendar" size={17} /><span>{item.label}</span></label>)}</div><p id="period-hint" className="time-hint">{!data.date ? 'اول روز دلخواهت را از تقویم انتخاب کن.' : isAllowedDay(data.date, currentToday) && periods.every(item => !isUpcomingPeriod(data.date, item.id, clockNow)) ? 'بازه‌های امروز تمام شده‌اند؛ روز دیگری انتخاب کن.' : 'ساعت‌ها به وقت تهران هستند.'}</p>{errors.period && <p className="field-error" id="period-error">{errors.period}</p>}</fieldset>
+      <button type="button" className="button primary full booking-cta" onClick={nextStep}>ادامه و ثبت اطلاعات <Icon name="arrow" size={20} /></button>
+      <p className="form-disclaimer">روز انتخابی، پیشنهاد توست؛ زمان نهایی را هماهنگ می‌کنیم.</p>
+    </> : <>
+      <div className="selected-appointment"><span>{services.find(item => item.id === data.service)!.name}{data.service === 'manicure' ? ` · ${manicureOptions.find(item => item.id === data.manicureType)?.label}` : ''}</span><span>{readableDay(data.date)}</span><span>ساعت {periods.find(item => item.id === data.period)?.label}</span><button className="text-button" type="button" onClick={() => setStep(0)}>تغییر وقت</button></div>
+      <div className="fields-grid"><div className="field"><label htmlFor="name">نام و نام خانوادگی</label><input id="name" name="name" autoComplete="name" value={data.name} maxLength={80} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} onChange={event => change('name', event.target.value)} placeholder="نامت را بنویس" />{errors.name && <p id="name-error" className="field-error">{errors.name}</p>}</div><div className="field"><label htmlFor="phone">شمارهٔ موبایل</label><input id="phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={data.phone} maxLength={20} aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? 'phone-error' : undefined} onChange={event => change('phone', event.target.value)} placeholder="09..." />{errors.phone && <p id="phone-error" className="field-error">{errors.phone}</p>}</div></div>
+      <div className="field"><label htmlFor="note">چیزی هست که قبل از وقتت بدانم؟ <span>(اختیاری)</span></label><textarea id="note" name="note" rows={3} maxLength={500} value={data.note} onChange={event => change('note', event.target.value)} placeholder="مثلاً مدل یا رنگ دلخواهت؛ اطلاعات حساس ننویس." />{errors.note && <p className="field-error">{errors.note}</p>}</div>
+      <label className="consent"><input type="checkbox" checked={data.consent} onChange={event => change('consent', event.target.checked)} /><span>با استفاده از این اطلاعات برای هماهنگی وقتم موافقم. <Link href="/privacy">حریم خصوصی</Link></span></label>
+      {errors.consent && <p className="field-error" role="alert">{errors.consent}</p>}
+      {errors.form && <p className="form-error" role="alert">{errors.form}</p>}
+      <button type="submit" disabled={pending} className="button primary full booking-cta">{pending ? 'در حال ثبت درخواست…' : useWhatsapp ? 'آماده‌کردن درخواست برای واتس‌اپ' : 'ثبت درخواست وقت'}<Icon name={useWhatsapp ? 'whatsapp' : 'arrow'} size={20} /></button>
+      <p className="form-disclaimer">{useWhatsapp ? 'پیام در واتس‌اپ باز می‌شود و خودت آن را ارسال می‌کنی.' : 'پس از ثبت، برای نهایی‌کردن نوبت با تو هماهنگ می‌کنیم.'}</p>
+      <a className="form-contact" href={salon.phoneLink}>ترجیح می‌دهی تلفنی هماهنگ کنی؟ تماس با تینا</a>
+    </>}
+    </fieldset>
+  </form>;
+}
