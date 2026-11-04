@@ -19,7 +19,9 @@ export function MobileBookingLink() {
     return () => observer.disconnect();
   }, []);
 
-  return <a className="mobile-booking" href="#booking" hidden={!visible}>
-    <Icon name="calendar" />درخواست وقت<span>هماهنگی با تینا</span>
+  return <a className="mobile-booking" href="#appointment-form" aria-label="انتخاب وقت با تینا" hidden={!visible}>
+    <span className="dock-icon"><Icon name="calendar" size={22} /></span>
+    <span className="dock-copy"><strong>وقتِ توئه.</strong><span>یک وقت، فقط برای تو</span></span>
+    <span className="dock-action">انتخاب وقت<Icon name="arrow" size={18} /></span>
   </a>;
 }

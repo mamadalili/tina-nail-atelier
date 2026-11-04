@@ -52,7 +52,11 @@ export default function Home() {
 
       <section id="contact" className="contact-section section" aria-labelledby="contact-title"><div className="wrap contact-layout"><div><span className="section-kicker" lang="en" dir="ltr">Let’s make time.</span><h2 id="contact-title">وقتِ یک<br /><em>حالِ تازه.</em></h2></div><div className="contact-details"><p className="contact-address">ستارخان، حبیب‌الله شمالی</p><a className="contact-number" href={salon.phoneLink} dir="ltr">۰۹۳۵ ۳۱۵ ۵۸۵۲</a><div className="contact-methods"><a href={salon.phoneLink}><Icon name="phone" />تماس</a><a href={salon.smsLink}><Icon name="sms" />پیامک</a><a href={salon.whatsapp} target="_blank" rel="noopener noreferrer"><Icon name="whatsapp" />واتس‌اپ</a></div><p className="quiet-note">پیش از مراجعه، زمان و آدرس دقیق را هماهنگ کن.</p></div></div></section>
     </main>
-    <footer className="site-footer wrap"><a className="footer-wordmark" href="/" lang="en" dir="ltr">Tina.</a><span>تینا حسین‌زاده · مانیکور و پدیکور</span><Link href="/privacy">حریم خصوصی</Link><a href="#main">بالای صفحه ↑</a></footer>
+    <footer className="site-footer wrap">
+      <a className="footer-wordmark" href="/" lang="en" dir="ltr">Tina.</a>
+      <div className="footer-identity"><strong>تینا · خدمات ناخن</strong><ul aria-label="خدمات تینا"><li>آرایشی</li><li>بهداشتی</li><li>پدیکور</li><li>مانیکور</li></ul></div>
+      <Link href="/privacy">حریم خصوصی</Link><a href="#main">بالای صفحه ↑</a>
+    </footer>
     <MobileBookingLink />
   </>;
 }
