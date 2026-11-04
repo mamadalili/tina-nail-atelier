@@ -14,9 +14,11 @@
 
 **Review focus:** preserving legacy reservations, concurrent booking versus blocking/moving, stale edits, cancelled idempotent retries, unauthenticated/private responses, CSRF/origin checks, credential leaks and UTC/Tehran boundaries.
 
-- [ ] Write failing migration/admin/auth tests, then implement transactions, versions, history and blocked slots; rerun the existing reservation/race tests.
-- [ ] Build the loopback password setup page and ask the owner to enter the password while independent implementation continues.
-- [ ] Implement authenticated API and a small React calendar/day list with edit/cancel/close/reopen controls; exercise the HTTP contract in isolated storage.
-- [ ] Extend the staged exports and archive safeguards for both public folders, without including guest storage. Build, typecheck, run the complete test suite and review.
-- [ ] Back up public assets and the existing private calendar, deploy verified source and private bootstrap, check locked/public responses and both UIs; have the owner perform production login with their password.
-- [ ] Commit/push to `main`, preserve both public links and record exact verification and remaining limitations.
+- [x] Write failing migration/admin/auth tests, then implement transactions, versions, history and blocked slots; rerun the existing reservation/race tests.
+- [x] Build the loopback password setup page and have the owner enter the password themselves.
+- [x] Implement authenticated API and a small React calendar/day list with edit/cancel/close/reopen controls; exercise the HTTP contract in isolated storage.
+- [x] Extend staged exports and archive safeguards for both public folders. Both builds/typecheck, all26 TypeScript tests and PHP authentication/storage/HTTP/concurrency checks passed; independent read-only review findings resolved.
+- [x] Deploy verified source without replacing guest storage, preserve the current site, and check manager login/public booking responses and both UIs.
+- [x] Commit/push verified source to `main`, preserve both public links and record verification in `docs/verification-administration.md`.
+
+Review resolution: stale dialogs close before refetching. Unknown mutation responses require inspecting refreshed state rather than claiming the change failed. Synthetic guest data was used only in isolated local storage. No actual customer booking was altered during verification.

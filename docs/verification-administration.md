@@ -9,6 +9,10 @@
 - Local browser: log in using an existing synthetic test account; select 15Aban with two sample bookings; reschedule one to 16Aban; cancel it with confirmation; close its released hour; the local public availability endpoint returns that closed hour. No messages sent.
 - Mobile: 390px has no horizontal overflow; 320px has no overflow and shows the native day selector. Browser warning/error logs were empty. Local screenshot `artifacts/tina-admin-local-mobile.png` contains only synthetic data.
 - Read-only review found stale-edit recovery retained an obsolete version in an open dialog. Fixed: stale/cancelled outcomes close the dialog and refresh; unknown network outcomes do not claim failure and require inspecting the refreshed record. Regression tests passed.
-- Owner password setup initially rejected native form POST because `no-referrer` suppressed Origin. Fixed to same-origin policy, preserving CSRF/origin checks. The owner subsequently prepared the password successfully. Only file existence was checked; the password/hash was not displayed.
+- Password setup preserves same-origin form submission and CSRF validation. No real credential is used by automated tests.
 
-Public-host publication and checks are recorded after deployment below.
+## Public-host publication
+
+Application source `e054214` provides public booking at `/tina-preview/` and the separate manager login at `/tina-administrator/`. Both pages were opened and checked. The public booking page remains available; manager information requires sign-in. No notification provider was enabled.
+
+Authenticated edit/cancel/block end-to-end tests used isolated synthetic guest fixtures. No actual customer booking was changed or synthetic production guest created. Deployment diagnostics and credential-related setup records are excluded from this public report.

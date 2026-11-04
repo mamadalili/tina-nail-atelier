@@ -2,6 +2,8 @@
 
 ## Current release
 
+**Administration update, 2026-11-04:** `/tina-administrator/` is now the separately exported, password-protected Persian management calendar. Public booking stays at `/tina-preview/`; closed/moved/cancelled slots share its private SQLite authority. Source `e054214`; see `administration.md` and `verification-administration.md`. Customer data is not part of either static export.
+
 **Update, 2026-11-04:** the preview now uses real shared-host booking storage. The former static-only limitation below is superseded. The PHP adapter confirms available slots and returns the final receipt; SMS and WhatsApp remain disabled. See `shared-host-booking.md` for storage, release and migration details. Application source: `d94e8c7`.
 
 Host checks confirmed `booking_live: true`, API health `enabled: true` with `notifications: false`, and public date availability. Guest storage is outside `public_html`; no synthetic guest was registered on the live calendar. Local verification covered the complete form-to-receipt flow, HTTP contract, all 23 project tests including PostgreSQL integration, and a six-process PHP race with one winner. Read-only review found and verified the fix for non-field API error messages.
