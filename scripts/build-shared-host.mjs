@@ -1,7 +1,7 @@
 import { cp, mkdir, mkdtemp, readFile, writeFile, symlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { resolve, join, dirname } from 'node:path';
+import { resolve, join, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -16,7 +16,12 @@ await cp(join(repo, 'deploy/shared-host/next.config.ts'), join(stage, 'next.conf
 await cp(join(repo, 'deploy/shared-host/PreviewImage.tsx'), join(stage, 'src/components/PreviewImage.tsx'));
 // The staging tree has static pages and PHP routes; the source tree keeps its Node routes.
 const { rm } = await import('node:fs/promises');
-await rm(join(stage, 'src/app/api'), { recursive: true, force: true });
+async function removeStageDirectory(base, relative) {
+  const target = resolve(base, relative);
+  if (dirname(base) !== parent || !target.startsWith(resolve(base) + sep)) throw new Error('Unsafe staging target');
+  await rm(target, { recursive: true, force: true });
+}
+await removeStageDirectory(stage, 'src/app/api');
 async function transform(file, edits) {
   let text = await readFile(join(stage, file), 'utf8');
   for (const [before, after] of edits) {
@@ -32,7 +37,7 @@ await transform('src/app/receipt-preview/page.tsx', [["export const dynamic = 'f
 await transform('src/app/robots.ts', [["export default", "export const dynamic = 'force-static';\n\nexport default"]]);
 const revision = spawnSync('git', ['-c', `safe.directory=${repo.replaceAll('\\', '/')}`, 'rev-parse', '--short', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
 await transform('src/app/layout.tsx', [['export const metadata: Metadata = {', `export const metadata: Metadata = {\n  other: { 'tina-preview-release': 'booking-20261104', 'tina-preview-source': '${revision}' },`]]);
-const env = { ...process.env, DATABASE_URL: '', SITE_URL: '', NEXT_PUBLIC_BOOKING_ADAPTER: 'shared-host', NEXT_PUBLIC_BASE_PATH: '/tina-preview', RECEIPT_PREVIEW_ENABLED: 'true', NEXT_TELEMETRY_DISABLED: '1' };
+const env = { ...process.env, DATABASE_URL: '', SITE_URL: '', NEXT_PUBLIC_BOOKING_ADAPTER: 'shared-host', NEXT_PUBLIC_BASE_PATH: '/tina-preview', NEXT_PUBLIC_RELEASE_REVISION: revision, RECEIPT_PREVIEW_ENABLED: 'true', NEXT_TELEMETRY_DISABLED: '1' };
 for (const [binary, args] of [['node', ['node_modules/prisma/build/index.js', 'generate']], ['node', ['node_modules/next/dist/bin/next', 'build', '--webpack']]]) {
   const result = spawnSync(binary, args, { cwd: stage, env, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status ?? 1);
@@ -45,6 +50,23 @@ await cp(join(repo, 'deploy/shared-host/runtime'), join(release, 'tina-booking-r
 await writeFile(join(release, 'tina-booking-runtime/.htaccess'), 'Require all denied\n');
 await writeFile(join(publicDir, '.htaccess'), `Options -Indexes\nDirectoryIndex index.html\n<IfModule mime_module>\nAddHandler application/x-httpd-ea-php84 .php\n</IfModule>\n<IfModule mod_headers.c>\nHeader always set X-Robots-Tag "noindex, nofollow"\nHeader always set X-Tina-Preview-Release "booking-20261104"\n<FilesMatch "\\.(html|txt|json)$">\nHeader set Cache-Control "no-cache, must-revalidate"\n</FilesMatch>\n</IfModule>\n`);
 await writeFile(join(publicDir, 'preview-release.json'), JSON.stringify({ source_commit: revision, release: 'booking-20261104', booking_live: true, notifications: false }));
+
+const adminStage = await mkdtemp(join(parent, 'tina-admin-stage-'));
+for (const name of ['src', 'tsconfig.json', 'next-env.d.ts', 'package.json', 'package-lock.json']) {
+  if (existsSync(join(repo, name))) await cp(join(repo, name), join(adminStage, name), { recursive: true });
+}
+await symlink(join(repo, 'node_modules'), join(adminStage, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
+await removeStageDirectory(adminStage, 'src/app');
+await mkdir(join(adminStage, 'src/app'), { recursive: true });
+await cp(join(repo, 'deploy/shared-host/admin-app/layout.tsx'), join(adminStage, 'src/app/layout.tsx'));
+await cp(join(repo, 'deploy/shared-host/admin-app/page.tsx'), join(adminStage, 'src/app/page.tsx'));
+await cp(join(repo, 'deploy/shared-host/admin-app/next.config.ts'), join(adminStage, 'next.config.ts'));
+const adminBuild = spawnSync('node', ['node_modules/next/dist/bin/next', 'build', '--webpack'], { cwd: adminStage, env, stdio: 'inherit' });
+if (adminBuild.status !== 0) process.exit(adminBuild.status ?? 1);
+const adminDir = join(release, 'public_html/tina-administrator');
+await cp(join(adminStage, 'out'), adminDir, { recursive: true });
+await cp(join(repo, 'deploy/shared-host/public/admin.php'), join(adminDir, 'api.php'));
+await writeFile(join(adminDir, '.htaccess'), `Options -Indexes\nDirectoryIndex index.html\n<IfModule mime_module>\nAddHandler application/x-httpd-ea-php84 .php\n</IfModule>\n<IfModule mod_headers.c>\nHeader always set X-Robots-Tag "noindex, nofollow"\nHeader always set Cache-Control "no-store, private"\nHeader always set X-Frame-Options "DENY"\nHeader always set X-Content-Type-Options "nosniff"\nHeader always set Referrer-Policy "same-origin"\n</IfModule>\n`);
 await mkdir(join(repo, 'artifacts'), { recursive: true });
-await writeFile(join(repo, 'artifacts/shared-host-release.json'), JSON.stringify({ stage, release, revision }, null, 2));
-console.log(JSON.stringify({ stage, release, revision }));
+await writeFile(join(repo, 'artifacts/shared-host-release.json'), JSON.stringify({ stage, adminStage, release, revision }, null, 2));
+console.log(JSON.stringify({ stage, adminStage, release, revision }));

@@ -12,13 +12,13 @@ for path in files:
     parts = path.relative_to(release).parts
     assert parts[0] in ('public_html', 'tina-booking-runtime')
     assert not any(part in ('data', '.git', 'node_modules', 'src') or part.startswith('.env') for part in parts)
-    assert path.suffix not in ('.sqlite', '.db', '.zip', '.log')
+    assert path.suffix not in ('.sqlite', '.db', '.zip', '.log', '.hash')
 target = repo / 'artifacts/tina-shared-host-booking-20261104.zip'
 with zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as archive:
     for path in files:
         name = path.relative_to(release).as_posix()
         if name.startswith('public_html/'):
-            assert name.startswith('public_html/tina-preview/')
+            assert name.startswith(('public_html/tina-preview/', 'public_html/tina-administrator/'))
         entry = zipfile.ZipInfo(name)
         entry.date_time = datetime.now().timetuple()[:6]
         entry.create_system = 3

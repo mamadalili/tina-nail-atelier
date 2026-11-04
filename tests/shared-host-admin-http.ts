@@ -1,0 +1,69 @@
+import assert from 'node:assert/strict';
+import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { spawn, spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { todayInTehran } from '../src/lib/jalali';
+
+const php = resolve('artifacts/php-runtime/php.exe');
+const ext = resolve('artifacts/php-runtime/ext');
+const root = await mkdtemp(join(tmpdir(), 'tina-admin-http-'));
+const runtime = join(root, 'tina-booking-runtime');
+const publicRoot = join(root, 'public_html');
+await cp('deploy/shared-host/runtime', runtime, { recursive: true });
+await mkdir(join(publicRoot, 'tina-administrator'), { recursive: true });
+await mkdir(join(publicRoot, 'tina-preview/api'), { recursive: true });
+await cp('deploy/shared-host/public/admin.php', join(publicRoot, 'tina-administrator/api.php'));
+await cp('deploy/shared-host/public/booking.php', join(publicRoot, 'tina-preview/api/booking.php'));
+const password = 'Only-local-test-42!';
+const hash = spawnSync(php, ['-r', 'echo password_hash(file_get_contents("php://stdin"), PASSWORD_BCRYPT);'], { input: password, encoding: 'utf8' });
+assert.ok(hash.status === 0, 'Generate only a local test credential');
+await writeFile(join(runtime, 'admin-bootstrap.hash'), hash.stdout, { mode: 0o600 });
+const child = spawn(php, ['-d', `extension_dir=${ext}`, '-d', 'extension=pdo_sqlite', '-S', '127.0.0.1:18231', '-t', publicRoot], { stdio: 'ignore' });
+const origin = 'http://127.0.0.1:18231';
+const endpoint = `${origin}/tina-administrator/api.php`;
+let cookie = ''; let csrf = '';
+async function api(action: string, body?: object, overrides: Record<string, string> = {}) {
+  const response = await fetch(`${endpoint}?action=${action}`, { method: body ? 'POST' : 'GET', headers: { Cookie: cookie, ...(body ? { Origin: origin, 'Content-Type': 'application/json', 'X-CSRF-Token': csrf } : {}), ...overrides }, body: body ? JSON.stringify(body) : undefined });
+  const setCookies = response.headers.getSetCookie();
+  if (setCookies.length) cookie = setCookies[0].split(';')[0];
+  return response;
+}
+try {
+  let ready = false;
+  for (let i = 0; i < 60 && !ready; i++) { try { const response = await api('status'); const status = await response.json(); csrf = status.csrf; ready = response.ok; } catch { await new Promise(resolve => setTimeout(resolve, 100)); } }
+  assert.ok(ready, 'PHP endpoint starts');
+  assert.equal((await api('month&month=1405-08')).status, 401);
+  assert.equal((await api('login', { password }, { Origin: 'https://foreign.invalid' })).status, 403);
+  assert.equal((await api('login', { password }, { 'X-CSRF-Token': 'invalid' })).status, 403);
+  const wrong = await api('login', { password: 'wrong' });
+  assert.equal(wrong.status, 401);
+  const beforeLogin = cookie;
+  const login = await api('login', { password });
+  assert.equal(login.status, 200);
+  assert.ok(cookie !== beforeLogin, 'Login rotates the session');
+  assert.ok(login.headers.getSetCookie().some(value => /HttpOnly/i.test(value) && /SameSite=Strict/i.test(value) && /path=\/tina-administrator\//i.test(value)), 'Cookie is private and scoped');
+  csrf = (await login.json()).csrf;
+  const day = todayInTehran(new Date(Date.now() + 12 * 86400000));
+  const month = day.slice(0, 7);
+  assert.equal((await api('block', { date: day, period: '16-18', blocked: true })).status, 200);
+  const bookUrl = `${origin}/tina-preview/api/booking.php`;
+  const availability = await (await fetch(`${bookUrl}?date=${day}`)).json();
+  assert.deepEqual(availability.taken, ['16-18']);
+  const data = { name: 'آزمون محلی پنل', phone: '09000000000', service: 'pedicure', manicureType: '', date: day, period: '10-12', note: '', consent: true };
+  const booking = await fetch(bookUrl, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() }, body: JSON.stringify(data) });
+  assert.equal(booking.status, 201);
+  const reference = (await booking.json()).receipt.reference;
+  const list = await api(`month&month=${month}`);
+  const row = (await list.json()).appointments.find((item: { reference: string }) => item.reference === reference);
+  assert.ok(row && row.phone === data.phone, 'Authenticated calendar contains private appointment');
+  assert.equal((await api('update', { reference, version: 1, data: { ...data, period: '12-14' } })).status, 200);
+  assert.equal((await api('cancel', { reference, version: 1 })).status, 409);
+  assert.equal((await api('cancel', { reference, version: 2 })).status, 200);
+  assert.equal((await api('block', { date: day, period: '16-18', blocked: false })).status, 200);
+  assert.deepEqual((await (await fetch(`${bookUrl}?date=${day}`)).json()).taken, []);
+  assert.equal((await api('logout', {})).status, 200);
+  assert.equal((await api(`month&month=${month}`)).status, 401);
+  console.log('PASS admin HTTP: private reads, Origin/CSRF, login rotation/cookies, block/public availability, edit/version/cancel and logout');
+} finally { child.kill(); await new Promise(resolve => child.once('exit', resolve)); await rm(root, { recursive: true, force: true }); }

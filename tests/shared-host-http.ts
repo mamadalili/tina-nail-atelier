@@ -8,7 +8,7 @@ assert.equal(base.hostname, '127.0.0.1', 'Use only isolated local storage for au
 const api = new URL('/tina-preview/api/booking.php', base);
 const data = { name: 'آزمایش محلی، مراجعه ندارد', phone: '09000000000', service: 'manicure', manicureType: 'gel', date: todayInTehran(new Date(Date.now() + 7 * 86400000)), period: '14-16', note: '', consent: true };
 const key = randomUUID();
-const post = (body: unknown, id = key, origin = base.origin) => fetch(api, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Idempotency-Key': id }, body: JSON.stringify(body) });
+const post = (body: unknown, id: string = key, origin = base.origin) => fetch(api, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Idempotency-Key': id }, body: JSON.stringify(body) });
 const health = await fetch(`${api}?action=health`);
 assert.equal(health.status, 200);
 assert.deepEqual(await health.json(), { enabled: true, notifications: false });

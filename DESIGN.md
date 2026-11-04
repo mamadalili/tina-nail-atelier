@@ -4,6 +4,10 @@ Reading this as: a Persian nail atelier and appointment website with a cinematic
 
 ## Current direction — revision 6
 
+### Appointment administration, 4 November 2026
+
+The owner asks for a very simple separate management page. This is an operational calendar rather than a marketing page: ENERGY 1 / RHYTHM 1 / MOTION 1. Reuse the existing gray, imperial green, burgundy and Vazirmatn so the two applications belong together. A Persian month calendar sits beside four chronological daily slots on desktop and stacks above them on phones. Green identifies selection and active bookings; labelled burgundy actions identify cancellation. Flat bordered rows distinguish free, occupied and closed hours without decorative charts or metrics. A native day selector replaces the seven-column grid on very small phones so taps remain usable. The edit dialog keeps the current guest/day/time together; cancellation names the exact guest and time before freeing the slot.
+
 ### Confirmed appointment pass, 4 November 2026
 
 The owner now chooses automatic confirmation for empty slots and backend-only notifications. The older manual-request/WhatsApp handoff notes below are superseded. A confirmed server response renders a keepable ticket with an imperial-green masthead, large Persian date, guest/service details and full tracking reference. A perforated stub and edge cutouts communicate a saved appointment pass; no decorative QR or barcode pretends to verify it. Native print produces only the ticket on one A5 page. The separately gated sample is visibly labeled and never creates a booking. Provider setup and message delivery remain server concerns.
