@@ -16,7 +16,7 @@
 - [x] Check phone, compact phone, intermediate and desktop widths; verify keyboard, errors and next/back with no external submission.
 - [x] Run existing tests, production build and diff check.
 - [x] Restart the local preview and record final browser evidence.
-- [ ] Push the verified refinement to main.
+- [x] Push the verified refinement to main: `9e41a97`.
 
 ## Review focus
 
