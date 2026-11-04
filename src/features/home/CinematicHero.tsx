@@ -12,7 +12,7 @@ export function CinematicHero() {
         </div>
         <div className="hero-details">
         <p className="hero-intro">مانیکور و پدیکور، با توجه به چیزی که تو دوست داری.<br className="desktop-break" /> از فرم و رنگ تا آخرین جزئیات.</p>
-        <div className="hero-actions"><a className="button primary" href="#booking">درخواست وقت <Icon name="arrow" size={20} /></a><a className="hero-service-link" href="#services">کشف خدمات <span aria-hidden="true">↙</span></a></div>
+        <div className="hero-actions"><a className="button primary" href="#booking">درخواست وقت <Icon name="arrow" size={20} /></a></div>
         <p className="hero-location">تهران · ستارخان، حبیب‌الله شمالی</p>
         </div>
       </div>

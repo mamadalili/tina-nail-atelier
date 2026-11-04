@@ -29,7 +29,7 @@ export default function Home() {
             <span className="section-kicker" lang="en" dir="ltr">A little time for you.</span>
             <h2 id="booking-title">یک وقت،<br /><em>فقط برای تو.</em></h2>
             <p>از اینجا شروع کنیم؛ خدمت، روز و ساعت دلخواهت را انتخاب کن. بعد، برای هماهنگی جزئیات با تو در تماسیم.</p>
-            <div className="booking-context"><Icon name="calendar" size={20} /><span>تقویم شمسی · ساعت‌ها به وقت تهران</span></div>
+            <div className="booking-context"><Icon name="calendar" size={20} /><span>ساعت‌ها به وقت تهران</span></div>
             <p className="booking-note">چهار بازهٔ دوساعته، از ۱۰ صبح تا ۶ عصر.<br />این فرم درخواست وقت است؛ نوبتت پس از هماهنگی با تینا نهایی می‌شود.</p>
             <a className="booking-phone" href={salon.phoneLink}><Icon name="phone" />هماهنگی تلفنی با تینا<span dir="ltr">۰۹۳۵ ۳۱۵ ۵۸۵۲</span></a>
           </div>

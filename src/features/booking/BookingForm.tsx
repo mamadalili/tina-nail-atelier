@@ -113,7 +113,7 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
   </div>;
 
   return <form className="booking-sheet" onSubmit={submit} noValidate>
-    <ol className="form-steps" aria-label="مراحل درخواست وقت"><li aria-current={step === 0 ? 'step' : undefined} className={step > 0 ? 'is-complete' : ''}><span aria-hidden="true">۰۱</span>خدمت و زمان</li><li aria-current={step === 1 ? 'step' : undefined}><span aria-hidden="true">۰۲</span>اطلاعات تماس</li></ol>
+    <ol className="form-steps" aria-label="مراحل درخواست وقت"><li aria-current={step === 0 ? 'step' : undefined} className={step > 0 ? 'is-complete' : ''}><span aria-hidden="true">۱</span>خدمت و زمان</li><li aria-current={step === 1 ? 'step' : undefined}><span aria-hidden="true">۲</span>اطلاعات تماس</li></ol>
     <div className="form-heading"><h3 ref={formHeading} tabIndex={-1}>{step === 0 ? 'وقت دلخواهت را انتخاب کن' : 'چطور با تو هماهنگ کنیم؟'}</h3><span>{step === 0 ? 'مرحلهٔ ۱ از ۲' : 'مرحلهٔ ۲ از ۲'}</span></div>
     <p className="form-validation" role="alert" hidden={!Object.keys(errors).length}>{Object.values(errors).join(' ')}</p>
     <fieldset disabled={pending} aria-busy={pending} className="booking-fields">

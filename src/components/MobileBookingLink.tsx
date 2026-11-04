@@ -20,6 +20,6 @@ export function MobileBookingLink() {
   }, []);
 
   return <a className="mobile-booking" href="#booking" hidden={!visible}>
-    <Icon name="calendar" />درخواست وقت<span>با تقویم شمسی</span>
+    <Icon name="calendar" />درخواست وقت<span>هماهنگی با تینا</span>
   </a>;
 }
