@@ -21,7 +21,7 @@ export function MobileBookingLink() {
 
   return <a className="mobile-booking" href="#appointment-form" aria-label="انتخاب وقت با تینا" hidden={!visible}>
     <span className="dock-icon"><Icon name="calendar" size={22} /></span>
-    <span className="dock-copy"><strong>وقتِ توئه.</strong><span>یک وقت، فقط برای تو</span></span>
+    <span className="dock-copy"><strong>وقتِ توئه.</strong><span>رزرو سریع وقت</span></span>
     <span className="dock-action">انتخاب وقت<Icon name="arrow" size={18} /></span>
   </a>;
 }
