@@ -14,8 +14,10 @@ export async function reserveAppointment(db: PrismaClient, key: string, input: u
   if (!validation.success) throw new ReservationError(422, 'INVALID_REQUEST', 'اطلاعات نوبت را بررسی کن.', validation.errors);
   const data = validation.data;
   const payloadHash = createHash('sha256').update(JSON.stringify(data)).digest('hex');
+  const { staff: _staff, ...legacyData } = data;
+  const legacyHash = createHash('sha256').update(JSON.stringify(legacyData)).digest('hex');
   function replay(record: NonNullable<typeof previous>) {
-    if (record.payloadHash !== payloadHash) throw new ReservationError(409, 'IDEMPOTENCY_CONFLICT', 'این شناسه برای اطلاعات دیگری استفاده شده؛ دوباره تلاش کن.');
+    if (record.payloadHash !== payloadHash && !(data.staff === 'tina' && record.payloadHash === legacyHash)) throw new ReservationError(409, 'IDEMPOTENCY_CONFLICT', 'این شناسه برای اطلاعات دیگری استفاده شده؛ دوباره تلاش کن.');
     if (record.status !== 'CONFIRMED') throw new ReservationError(409, 'NOT_CONFIRMED', 'این نوبت قطعی نیست؛ برای پیگیری با تینا تماس بگیر.');
     return receiptFor(record);
   }
@@ -34,6 +36,7 @@ export async function reserveAppointment(db: PrismaClient, key: string, input: u
       const created = await tx.appointmentRequest.create({ data: {
         reference: `TN-${randomBytes(8).toString('hex').toUpperCase()}`, idempotencyKey: key, payloadHash,
         name: data.name, phone: data.phone, service: data.service, manicureType: data.manicureType || null,
+        staff: data.staff ?? 'tina',
         preferredDay: new Date(`${toGregorianDay(data.date)}T00:00:00Z`), jalaliDay: data.date, period: data.period,
         note: data.note, status: 'CONFIRMED', ...times,
         outbox: { create: ['SMS_USER', 'SMS_ADMIN', 'WHATSAPP_ADMIN'].map(channel => ({ channel, kind: 'CONFIRMED' })) },
@@ -44,7 +47,7 @@ export async function reserveAppointment(db: PrismaClient, key: string, input: u
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
       const repeated = await db.appointmentRequest.findUnique({ where: { idempotencyKey: key } });
       if (repeated) return { receipt: replay(repeated), repeated: true };
-      const occupied = await db.appointmentRequest.findFirst({ where: { jalaliDay: data.date, period: data.period, status: 'CONFIRMED' }, select: { id: true } });
+      const occupied = await db.appointmentRequest.findFirst({ where: { staff: data.staff ?? 'tina', jalaliDay: data.date, period: data.period, status: 'CONFIRMED' }, select: { id: true } });
       if (occupied) throw new ReservationError(409, 'SLOT_TAKEN', 'این بازه همین حالا رزرو شد؛ ساعت یا روز دیگری انتخاب کن.', { period: 'این بازه دیگر خالی نیست.' });
     }
     throw error;

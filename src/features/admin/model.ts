@@ -1,13 +1,14 @@
 import { z } from 'zod';
-import { periods } from '../../content/salon';
+import { periods, staffMembers } from '../../content/salon';
 import { dateKey, monthCells } from '../../lib/jalali';
 
 export const appointmentSchema = z.object({
   reference: z.string().regex(/^TN-[A-F0-9]{16,32}$/), status: z.enum(['CONFIRMED', 'CANCELLED']), version: z.number().int().positive(),
   name: z.string(), phone: z.string(), service: z.enum(['manicure', 'pedicure']), manicureType: z.enum(['', 'gel', 'extensions']),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), period: z.enum(periods.map(item => item.id)), note: z.string(), issuedAt: z.string(), updatedAt: z.string().nullable(),
+  staff: z.enum(staffMembers.map(item => item.id)).default('tina'),
 });
-export const monthSchema = z.object({ month: z.string(), appointments: z.array(appointmentSchema), blocks: z.array(z.object({ date: z.string(), period: z.string() })) });
+export const monthSchema = z.object({ month: z.string(), staff: z.enum(staffMembers.map(item => item.id)).default('tina'), appointments: z.array(appointmentSchema), blocks: z.array(z.object({ date: z.string(), period: z.string(), staff: z.enum(staffMembers.map(item => item.id)).optional() })) });
 export type Appointment = z.infer<typeof appointmentSchema>;
 export type CalendarData = z.infer<typeof monthSchema>;
 export type SlotBlock = CalendarData['blocks'][number];

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { daySlots, validDateChange, monthSummary, mutationRecovery } from '../src/features/admin/model';
 
 test('daily slots distinguish bookings, blocks and cancellation without hiding empty hours', () => {
-  const active = { reference: 'TN-AAAAAAAAAAAAAAAA', status: 'CONFIRMED', version: 1, name: 'مهمان', phone: '09000000000', service: 'pedicure', manicureType: '', date: '1405-08-16', period: '12-14', note: '', issuedAt: '2026-11-04T08:00:00Z', updatedAt: null } as const;
+  const active = { reference: 'TN-AAAAAAAAAAAAAAAA', staff: 'tina', status: 'CONFIRMED', version: 1, name: 'مهمان', phone: '09000000000', service: 'pedicure', manicureType: '', date: '1405-08-16', period: '12-14', note: '', issuedAt: '2026-11-04T08:00:00Z', updatedAt: null } as const;
   const slots = daySlots('1405-08-16', [active, { ...active, reference: 'TN-BBBBBBBBBBBBBBBB', status: 'CANCELLED', period: '10-12' }], [{ date: '1405-08-16', period: '14-16' }]);
   assert.deepEqual(slots.map(slot => slot.kind), ['free', 'appointment', 'blocked', 'free']);
   assert.equal(slots[1].appointment?.reference, active.reference);

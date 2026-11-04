@@ -19,6 +19,7 @@ export function BookingReceipt({ receipt, preview = false, headingRef, notificat
         <div className="ticket-guest"><span className="ticket-label">مهمان ما</span><strong>{receipt.name}</strong></div>
         <div className="ticket-when"><div className="ticket-date"><span className="ticket-label">{weekday}</span><strong>{faNumber(day)} <span>{months[month - 1]}</span></strong><small>{faNumber(year)}</small></div><div className="ticket-time"><span className="ticket-label">ساعت مراجعه</span><strong>{periods.find(item => item.id === receipt.period)!.label}</strong><small>به وقت تهران · ۲ ساعت</small></div></div>
         <div className="ticket-service"><span className="ticket-label">برای تو</span><strong>{receipt.service}{receipt.treatment && <span> / {receipt.treatment}</span>}</strong></div>
+        <div className="ticket-location"><span className="ticket-label">وقت با</span><strong>{receipt.staffName}</strong></div>
         <div className="ticket-location"><span className="ticket-label">آدرس</span><span>تهران، {salon.address}</span></div>
       </div>
       <footer className="ticket-stub"><div><span className="ticket-label">کد پیگیری نوبت</span><strong dir="ltr">{receipt.reference}</strong></div><span className="ticket-stub-mark" lang="en" dir="ltr">See you<br /><em>at Tina’s.</em></span></footer>

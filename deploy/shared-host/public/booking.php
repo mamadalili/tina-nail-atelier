@@ -18,7 +18,8 @@ try {
         if (($_GET['action']??'')==='health') respond(200,['enabled'=>true,'notifications'=>false]);
         $date=$_GET['date']??'';
         if(!is_string($date)) respond(400,['message'=>'روز معتبر انتخاب کن.']);
-        respond(200,$store->availability($date,$now));
+        $staff=$_GET['staff']??'tina';if(!is_string($staff))respond(400,['message'=>'فرد معتبر انتخاب کن.']);
+        respond(200,$store->availability($date,$now,$staff));
     }
     if ($_SERVER['REQUEST_METHOD']!=='POST') { header('Allow: GET, POST');respond(405,['message'=>'این روش درخواست مجاز نیست.']); }
     $origin=$_SERVER['HTTP_ORIGIN']??'';

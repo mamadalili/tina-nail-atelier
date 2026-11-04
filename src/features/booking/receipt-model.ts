@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { manicureOptions, periods, services } from '../../content/salon';
+import { manicureOptions, periods, services, staffMembers } from '../../content/salon';
 import { toGregorianDay } from '../../lib/jalali';
 
 export const receiptSchema = z.object({
@@ -13,7 +13,8 @@ export const receiptSchema = z.object({
   startsAt: z.iso.datetime(),
   endsAt: z.iso.datetime(),
   issuedAt: z.iso.datetime(),
-});
+  staff: z.enum(staffMembers.map(item => item.id)).default('tina'),
+}).transform(data => ({ ...data, staffName: staffMembers.find(item => item.id === data.staff)!.name }));
 export type BookingReceiptData = z.infer<typeof receiptSchema>;
 
 export function slotTimes(day: string, periodId: string) {
@@ -28,7 +29,7 @@ export function slotTimes(day: string, periodId: string) {
   return { startsAt, endsAt: new Date(startsAt.getTime() + 2 * 3600000) };
 }
 
-export type ReceiptRecord = { reference: string; status: string; name: string; service: string; manicureType: string | null; jalaliDay: string; period: string; createdAt: Date };
+export type ReceiptRecord = { reference: string; status: string; name: string; service: string; manicureType: string | null; jalaliDay: string; period: string; createdAt: Date; staff?: string };
 
 export function receiptFor(record: ReceiptRecord): BookingReceiptData {
   if (record.status !== 'CONFIRMED') throw new Error('BOOKING_NOT_CONFIRMED');
@@ -38,6 +39,6 @@ export function receiptFor(record: ReceiptRecord): BookingReceiptData {
   return receiptSchema.parse({
     reference: record.reference, status: record.status, name: record.name, service: service.name,
     treatment: record.service === 'manicure' ? manicureOptions.find(item => item.id === record.manicureType)?.label ?? '' : '',
-    date: record.jalaliDay, period: record.period, startsAt: slot.startsAt.toISOString(), endsAt: slot.endsAt.toISOString(), issuedAt: record.createdAt.toISOString(),
+    date: record.jalaliDay, period: record.period, startsAt: slot.startsAt.toISOString(), endsAt: slot.endsAt.toISOString(), issuedAt: record.createdAt.toISOString(), staff: record.staff ?? 'tina',
   });
 }

@@ -2,8 +2,8 @@ export function bookingEndpoints(adapter?: string, basePath = '') {
   const prefix = basePath.replace(/\/$/, '');
   const php = `${prefix}/api/booking.php`;
   return adapter === 'shared-host'
-    ? { appointment: php, availability: (date: string) => `${php}?date=${encodeURIComponent(date)}` }
-    : { appointment: `${prefix}/api/appointment-requests`, availability: (date: string) => `${prefix}/api/availability?date=${encodeURIComponent(date)}` };
+    ? { appointment: php, availability: (date: string, staff?: string) => `${php}?date=${encodeURIComponent(date)}${staff ? `&staff=${encodeURIComponent(staff)}` : ''}` }
+    : { appointment: `${prefix}/api/appointment-requests`, availability: (date: string, staff?: string) => `${prefix}/api/availability?date=${encodeURIComponent(date)}${staff ? `&staff=${encodeURIComponent(staff)}` : ''}` };
 }
 
 export const bookingApi = bookingEndpoints(process.env.NEXT_PUBLIC_BOOKING_ADAPTER, process.env.NEXT_PUBLIC_BASE_PATH);

@@ -8,11 +8,13 @@ final class BookingFailure extends RuntimeException {
 final class BookingStore {
     private PDO $db;
     private const PERIODS = ['10-12'=>10,'12-14'=>12,'14-16'=>14,'16-18'=>16];
+    private const STAFF = ['tina'=>'تینا','sonia'=>'سونیا'];
 
     public function __construct(string $path) {
         $this->db = new PDO('sqlite:'.$path, null, null, [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
         $this->db->exec('PRAGMA busy_timeout=10000');
         $this->migrateSchema($path);
+        $this->migrateStaff($path);
         $this->db->exec('CREATE TABLE IF NOT EXISTS rate_limits (client TEXT NOT NULL, bucket INTEGER NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(client,bucket))');
         $this->db->exec('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
         $secret = $this->db->prepare('INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)');
@@ -61,6 +63,31 @@ final class BookingStore {
         return (new DateTimeImmutable($start,new DateTimeZone('Asia/Tehran')))->modify('+'.$offset.' days')->format('Y-m-d');
     }
 
+    private function migrateStaff(string $path):void {
+        $columns=$this->db->query('PRAGMA table_info(appointments)')->fetchAll(PDO::FETCH_COLUMN,1);
+        if(in_array('staff',$columns,true))return;
+        $backup=$path.'.before-staff-'.gmdate('YmdHis').'-'.bin2hex(random_bytes(3)).'.sqlite';
+        $this->db->exec('VACUUM INTO '.$this->db->quote($backup));@chmod($backup,0600);
+        $this->db->exec('BEGIN IMMEDIATE');
+        try{
+            $columns=$this->db->query('PRAGMA table_info(appointments)')->fetchAll(PDO::FETCH_COLUMN,1);
+            if(!in_array('staff',$columns,true)){
+                $this->db->exec("ALTER TABLE appointments ADD COLUMN staff TEXT NOT NULL DEFAULT 'tina' CHECK(staff IN ('tina','sonia'))");
+                $this->db->exec('DROP INDEX IF EXISTS confirmed_slot');
+                $this->db->exec("CREATE UNIQUE INDEX confirmed_slot ON appointments(staff,jalali_day,period) WHERE status='CONFIRMED'");
+                $this->db->exec("CREATE TABLE slot_blocks_staff(staff TEXT NOT NULL DEFAULT 'tina' CHECK(staff IN ('tina','sonia')),jalali_day TEXT NOT NULL,period TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(staff,jalali_day,period))");
+                $this->db->exec("INSERT INTO slot_blocks_staff(staff,jalali_day,period,created_at) SELECT 'tina',jalali_day,period,created_at FROM slot_blocks");
+                $this->db->exec('DROP TABLE slot_blocks');$this->db->exec('ALTER TABLE slot_blocks_staff RENAME TO slot_blocks');
+            }
+            $this->db->exec('COMMIT');
+        }catch(Throwable $error){$this->db->exec('ROLLBACK');throw $error;}
+    }
+
+    private static function staff(mixed $value):string {
+        if(!is_string($value)||!isset(self::STAFF[$value]))self::invalid('staff','تینا یا سونیا را انتخاب کن.');
+        return $value;
+    }
+
     private static function invalid(string $field,string $message): never { throw new BookingFailure('VALIDATION',422,$message,[$field=>$message]); }
     private static function textLength(string $text): int { return preg_match_all('/./us',$text); }
     private static function normalized(mixed $input): array {
@@ -81,7 +108,7 @@ final class BookingStore {
         if (self::textLength($note)>500) self::invalid('note','توضیحات را کوتاه‌تر از ۵۰۰ حرف بنویس.');
         if (($input['consent']??false)!==true) self::invalid('consent','رضایت تماس را تأیید کن.');
         self::gregorian($input['date']);
-        return ['name'=>$name,'phone'=>$phone,'service'=>$input['service'],'manicureType'=>$input['service']==='manicure'?$input['manicureType']:'','date'=>$input['date'],'period'=>$input['period'],'note'=>$note,'consent'=>true];
+        return ['name'=>$name,'phone'=>$phone,'service'=>$input['service'],'manicureType'=>$input['service']==='manicure'?$input['manicureType']:'','date'=>$input['date'],'period'=>$input['period'],'note'=>$note,'consent'=>true,'staff'=>self::staff($input['staff']??'tina')];
     }
 
     private static function allowedDate(string $day,DateTimeImmutable $now): string {
@@ -91,10 +118,11 @@ final class BookingStore {
         return $gregorian;
     }
 
-    public function availability(string $day,DateTimeImmutable $now): array {
+    public function availability(string $day,DateTimeImmutable $now,string $staff='tina'): array {
+        self::staff($staff);
         self::allowedDate($day,$now);
-        $query=$this->db->prepare("SELECT period FROM appointments WHERE jalali_day=? AND status='CONFIRMED' UNION SELECT period FROM slot_blocks WHERE jalali_day=? ORDER BY period");
-        $query->execute([$day,$day]);
+        $query=$this->db->prepare("SELECT period FROM appointments WHERE jalali_day=? AND staff=? AND status='CONFIRMED' UNION SELECT period FROM slot_blocks WHERE jalali_day=? AND staff=? ORDER BY period");
+        $query->execute([$day,$staff,$day,$staff]);
         return ['date'=>$day,'taken'=>$query->fetchAll(PDO::FETCH_COLUMN)];
     }
 
@@ -104,19 +132,20 @@ final class BookingStore {
         $data=self::normalized($input);
         $payload=json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
         $hash=hash('sha256',$payload);
+        $legacyData=$data;unset($legacyData['staff']);$legacyHash=hash('sha256',json_encode($legacyData,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
         $this->db->exec('BEGIN IMMEDIATE');
         try {
-            $query=$this->db->prepare('SELECT payload_hash,receipt,status FROM appointments WHERE request_key=?'); $query->execute([$key]); $old=$query->fetch(PDO::FETCH_ASSOC);
+            $query=$this->db->prepare('SELECT payload_hash,receipt,status,staff FROM appointments WHERE request_key=?'); $query->execute([$key]); $old=$query->fetch(PDO::FETCH_ASSOC);
             if ($old) {
-                if (!hash_equals($old['payload_hash'],$hash)) throw new BookingFailure('IDEMPOTENCY_CONFLICT',409,'اطلاعات درخواست تغییر کرده؛ دوباره ثبت کن.');
+                if (!hash_equals($old['payload_hash'],$hash)&&!($data['staff']==='tina'&&hash_equals($old['payload_hash'],$legacyHash))) throw new BookingFailure('IDEMPOTENCY_CONFLICT',409,'اطلاعات درخواست تغییر کرده؛ دوباره ثبت کن.');
                 if($old['status']!=='CONFIRMED')throw new BookingFailure('BOOKING_CANCELLED',409,'این نوبت لغو شده است. برای نوبت تازه دوباره روز و ساعت انتخاب کن.');
                 $this->db->exec('COMMIT');
-                return ['receipt'=>json_decode($old['receipt'],true,512,JSON_THROW_ON_ERROR),'repeated'=>true];
+                return ['receipt'=>array_replace(json_decode($old['receipt'],true,512,JSON_THROW_ON_ERROR),['staff'=>$old['staff'],'staffName'=>self::STAFF[$old['staff']]]),'repeated'=>true];
             }
             $gregorian=self::allowedDate($data['date'],$now);
             $start=new DateTimeImmutable($gregorian.' '.self::PERIODS[$data['period']].':00:00',new DateTimeZone('Asia/Tehran'));
             if ($start<$now) self::invalid('period','این بازه شروع شده؛ ساعت دیگری انتخاب کن.');
-            $this->assertSlotFree($data['date'],$data['period']);
+            $this->assertSlotFree($data['date'],$data['period'],$data['staff']);
             $secret=$this->db->query("SELECT value FROM settings WHERE key='rate_secret'")->fetchColumn();
             $clientHash=hash_hmac('sha256',$client,$secret); $bucket=(int)floor($now->getTimestamp()/3600);
             $query=$this->db->prepare('SELECT count FROM rate_limits WHERE client=? AND bucket=?');$query->execute([$clientHash,$bucket]);
@@ -125,31 +154,33 @@ final class BookingStore {
             $query=$this->db->prepare('DELETE FROM rate_limits WHERE bucket<?');$query->execute([$bucket-24]);
             $utc=new DateTimeZone('UTC');$iso=fn(DateTimeImmutable $date)=>$date->setTimezone($utc)->format('Y-m-d\TH:i:s.000\Z');
             $receipt=['reference'=>'TN-'.strtoupper(bin2hex(random_bytes(12))),'status'=>'CONFIRMED','name'=>$data['name'],'service'=>$data['service']==='manicure'?'خدمات مانیکور':'خدمات پدیکور','treatment'=>$data['service']==='manicure'?($data['manicureType']==='gel'?'ژلیش':'کاشت'):'','date'=>$data['date'],'period'=>$data['period'],'startsAt'=>$iso($start),'endsAt'=>$iso($start->modify('+2 hours')),'issuedAt'=>$iso($now)];
-            $query=$this->db->prepare('INSERT INTO appointments(reference,request_key,payload_hash,jalali_day,period,receipt,payload,created_at) VALUES (?,?,?,?,?,?,?,?)');
-            $query->execute([$receipt['reference'],$key,$hash,$data['date'],$data['period'],json_encode($receipt,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$payload,$receipt['issuedAt']]);
+            $receipt['staff']=$data['staff'];$receipt['staffName']=self::STAFF[$data['staff']];
+            $query=$this->db->prepare('INSERT INTO appointments(reference,request_key,payload_hash,jalali_day,period,receipt,payload,created_at,staff) VALUES (?,?,?,?,?,?,?,?,?)');
+            $query->execute([$receipt['reference'],$key,$hash,$data['date'],$data['period'],json_encode($receipt,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$payload,$receipt['issuedAt'],$data['staff']]);
             $this->db->exec('COMMIT');
             return ['receipt'=>$receipt,'repeated'=>false];
         } catch(Throwable $error) { $this->db->exec('ROLLBACK');throw $error; }
     }
 
-    private function assertSlotFree(string $day,string $period,string $exclude=''):void {
-        $q=$this->db->prepare("SELECT 1 FROM appointments WHERE jalali_day=? AND period=? AND status='CONFIRMED' AND reference<>? UNION SELECT 1 FROM slot_blocks WHERE jalali_day=? AND period=? LIMIT 1");
-        $q->execute([$day,$period,$exclude,$day,$period]);
+    private function assertSlotFree(string $day,string $period,string $staff,string $exclude=''):void {
+        $q=$this->db->prepare("SELECT 1 FROM appointments WHERE jalali_day=? AND period=? AND staff=? AND status='CONFIRMED' AND reference<>? UNION SELECT 1 FROM slot_blocks WHERE jalali_day=? AND period=? AND staff=? LIMIT 1");
+        $q->execute([$day,$period,$staff,$exclude,$day,$period,$staff]);
         if($q->fetchColumn())throw new BookingFailure('SLOT_TAKEN',409,'این ساعت در دسترس نیست؛ ساعت دیگری انتخاب کن.',['period'=>'این ساعت رزرو یا بسته شده است.']);
     }
 
     private static function adminRecord(array $row):array {
         $data=json_decode($row['payload'],true,512,JSON_THROW_ON_ERROR);
-        return ['reference'=>$row['reference'],'status'=>$row['status'],'version'=>(int)$row['version'],'name'=>$data['name'],'phone'=>$data['phone'],'service'=>$data['service'],'manicureType'=>$data['manicureType'],'date'=>$row['jalali_day'],'period'=>$row['period'],'note'=>$data['note'],'issuedAt'=>$row['created_at'],'updatedAt'=>$row['updated_at']];
+        return ['reference'=>$row['reference'],'status'=>$row['status'],'version'=>(int)$row['version'],'name'=>$data['name'],'phone'=>$data['phone'],'service'=>$data['service'],'manicureType'=>$data['manicureType'],'date'=>$row['jalali_day'],'period'=>$row['period'],'note'=>$data['note'],'issuedAt'=>$row['created_at'],'updatedAt'=>$row['updated_at'],'staff'=>$row['staff']];
     }
 
-    public function adminMonth(string $month):array {
+    public function adminMonth(string $month,string $staff='tina'):array {
+        self::staff($staff);
         if(!preg_match('/^\d{4}-\d{2}$/D',$month))self::invalid('month','ماه معتبر انتخاب کن.');
         self::gregorian($month.'-01');
-        $q=$this->db->prepare('SELECT * FROM appointments WHERE jalali_day LIKE ? ORDER BY jalali_day,period,created_at');$q->execute([$month.'-%']);
+        $q=$this->db->prepare('SELECT * FROM appointments WHERE jalali_day LIKE ? AND staff=? ORDER BY jalali_day,period,created_at');$q->execute([$month.'-%',$staff]);
         $records=array_map([self::class,'adminRecord'],$q->fetchAll(PDO::FETCH_ASSOC));
-        $q=$this->db->prepare('SELECT jalali_day AS date,period FROM slot_blocks WHERE jalali_day LIKE ? ORDER BY jalali_day,period');$q->execute([$month.'-%']);
-        return ['month'=>$month,'appointments'=>$records,'blocks'=>$q->fetchAll(PDO::FETCH_ASSOC)];
+        $q=$this->db->prepare('SELECT jalali_day AS date,period,staff FROM slot_blocks WHERE jalali_day LIKE ? AND staff=? ORDER BY jalali_day,period');$q->execute([$month.'-%',$staff]);
+        return ['month'=>$month,'staff'=>$staff,'appointments'=>$records,'blocks'=>$q->fetchAll(PDO::FETCH_ASSOC)];
     }
 
     private function editableRecord(string $reference,int $version):array {
@@ -170,17 +201,18 @@ final class BookingStore {
         $this->db->exec('BEGIN IMMEDIATE');
         try{
             $old=$this->editableRecord($reference,$version);
-            $moved=$data['date']!==$old['jalali_day']||$data['period']!==$old['period'];
+            $moved=$data['date']!==$old['jalali_day']||$data['period']!==$old['period']||$data['staff']!==$old['staff'];
             $date=$moved?self::allowedDate($data['date'],$now):self::gregorian($data['date']);
             $start=new DateTimeImmutable($date.' '.self::PERIODS[$data['period']].':00:00',new DateTimeZone('Asia/Tehran'));
             if($moved&&$start<$now)self::invalid('period','این ساعت گذشته است؛ ساعت آینده را انتخاب کن.');
-            $this->assertSlotFree($data['date'],$data['period'],$reference);
+            $this->assertSlotFree($data['date'],$data['period'],$data['staff'],$reference);
             $receipt=json_decode($old['receipt'],true,512,JSON_THROW_ON_ERROR);
             $iso=fn(DateTimeImmutable $time)=>$time->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.000\Z');
             $receipt=array_replace($receipt,['name'=>$data['name'],'date'=>$data['date'],'period'=>$data['period'],'service'=>$data['service']==='manicure'?'خدمات مانیکور':'خدمات پدیکور','treatment'=>$data['service']==='manicure'?($data['manicureType']==='gel'?'ژلیش':'کاشت'):'','startsAt'=>$iso($start),'endsAt'=>$iso($start->modify('+2 hours'))]);
-            $q=$this->db->prepare('UPDATE appointments SET jalali_day=?,period=?,payload=?,receipt=?,version=version+1,updated_at=? WHERE reference=?');
-            $q->execute([$data['date'],$data['period'],json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),json_encode($receipt,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$now->format(DATE_ATOM),$reference]);
-            $this->audit($reference,$moved?'RESCHEDULE':'EDIT',['from'=>[$old['jalali_day'],$old['period']],'to'=>[$data['date'],$data['period']]],$now);
+            $receipt['staff']=$data['staff'];$receipt['staffName']=self::STAFF[$data['staff']];
+            $q=$this->db->prepare('UPDATE appointments SET jalali_day=?,period=?,staff=?,payload=?,receipt=?,version=version+1,updated_at=? WHERE reference=?');
+            $q->execute([$data['date'],$data['period'],$data['staff'],json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),json_encode($receipt,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$now->format(DATE_ATOM),$reference]);
+            $this->audit($reference,$moved?'RESCHEDULE':'EDIT',['from'=>[$old['staff'],$old['jalali_day'],$old['period']],'to'=>[$data['staff'],$data['date'],$data['period']]],$now);
             $q=$this->db->prepare('SELECT * FROM appointments WHERE reference=?');$q->execute([$reference]);$result=self::adminRecord($q->fetch(PDO::FETCH_ASSOC));
             $this->db->exec('COMMIT');return $result;
         }catch(Throwable $error){$this->db->exec('ROLLBACK');throw $error;}
@@ -196,17 +228,18 @@ final class BookingStore {
         }catch(Throwable $error){$this->db->exec('ROLLBACK');throw $error;}
     }
 
-    public function setBlocked(string $day,string $period,bool $blocked,DateTimeImmutable $now):void {
+    public function setBlocked(string $day,string $period,bool $blocked,DateTimeImmutable $now,string $staff='tina'):void {
+        self::staff($staff);
         if(!isset(self::PERIODS[$period]))self::invalid('period','ساعت معتبر انتخاب کن.');
         if($blocked)self::allowedDate($day,$now);else self::gregorian($day);
         $this->db->exec('BEGIN IMMEDIATE');
         try{
             if($blocked){
-                $q=$this->db->prepare("SELECT 1 FROM appointments WHERE jalali_day=? AND period=? AND status='CONFIRMED'");$q->execute([$day,$period]);
+                $q=$this->db->prepare("SELECT 1 FROM appointments WHERE jalali_day=? AND period=? AND staff=? AND status='CONFIRMED'");$q->execute([$day,$period,$staff]);
                 if($q->fetchColumn())throw new BookingFailure('SLOT_TAKEN',409,'این ساعت نوبت ثبت‌شده دارد؛ ابتدا نوبت را جابه‌جا یا لغو کن.');
-                $q=$this->db->prepare('INSERT OR IGNORE INTO slot_blocks(jalali_day,period,created_at) VALUES (?,?,?)');$q->execute([$day,$period,$now->format(DATE_ATOM)]);
-            }else{$q=$this->db->prepare('DELETE FROM slot_blocks WHERE jalali_day=? AND period=?');$q->execute([$day,$period]);}
-            $this->audit(null,$blocked?'BLOCK':'REOPEN',['date'=>$day,'period'=>$period],$now);
+                $q=$this->db->prepare('INSERT OR IGNORE INTO slot_blocks(staff,jalali_day,period,created_at) VALUES (?,?,?,?)');$q->execute([$staff,$day,$period,$now->format(DATE_ATOM)]);
+            }else{$q=$this->db->prepare('DELETE FROM slot_blocks WHERE jalali_day=? AND period=? AND staff=?');$q->execute([$day,$period,$staff]);}
+            $this->audit(null,$blocked?'BLOCK':'REOPEN',['staff'=>$staff,'date'=>$day,'period'=>$period],$now);
             $this->db->exec('COMMIT');
         }catch(Throwable $error){$this->db->exec('ROLLBACK');throw $error;}
     }

@@ -15,6 +15,8 @@ export const services = [
 ] as const;
 
 export type ServiceId = typeof services[number]['id'];
+export const staffMembers = [{ id: 'tina', name: 'تینا' }, { id: 'sonia', name: 'سونیا' }] as const;
+export type StaffId = typeof staffMembers[number]['id'];
 export const manicureOptions = [
   { id: 'gel', label: 'ژلیش' },
   { id: 'extensions', label: 'کاشت' },

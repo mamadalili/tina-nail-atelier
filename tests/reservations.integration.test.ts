@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { strict as assert } from 'node:assert';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { validateRequest } from '../src/features/booking/model';
 import { test } from 'node:test';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client';
@@ -13,7 +14,7 @@ test('database arbitrates concurrent slots and idempotent retries with one outbo
   const url = new URL(process.env.DATABASE_URL!);
   assert.ok(['127.0.0.1', 'localhost'].includes(url.hostname), 'Integration test requires an isolated loopback database');
   const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.toString(), max: 4, connectionTimeoutMillis: 5000 }) });
-  const keys = [randomUUID(), randomUUID(), randomUUID()];
+  const keys = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()];
   const data = { name: 'تست تراکنش', phone: '09120000000', service: 'manicure', manicureType: 'gel', date: todayInTehran(new Date(Date.now() + 30 * 86400000)), period: '12-14', note: '', consent: true };
   try {
     const results = await Promise.allSettled([
@@ -36,6 +37,14 @@ test('database arbitrates concurrent slots and idempotent retries with one outbo
     assert.equal(records[0].outbox.length, 3);
     assert.deepEqual(records[0].outbox.map(item => item.channel).sort(), ['SMS_ADMIN', 'SMS_USER', 'WHATSAPP_ADMIN']);
     assert.ok(records[0].outbox.every(item => item.sentAt === null));
+    const sonia = await reserveAppointment(db, keys[3], { ...data, phone: '09120000002', staff: 'sonia' });
+    assert.equal(sonia.receipt.staffName, 'سونیا');
+    await assert.rejects(reserveAppointment(db, keys[4], { ...data, phone: '09120000003', staff: 'sonia' }), (error: unknown) => error instanceof ReservationError && error.code === 'SLOT_TAKEN');
+    const parsed = validateRequest(winnerData, data.date);
+    assert.ok(parsed.success);
+    const { staff: _staff, ...legacy } = parsed.data;
+    await db.appointmentRequest.update({ where: { id: records[0].id }, data: { payloadHash: createHash('sha256').update(JSON.stringify(legacy)).digest('hex') } });
+    assert.equal((await reserveAppointment(db, keys[index], winnerData)).receipt.staff, 'tina');
     await assert.rejects(reserveAppointment(db, keys[index], { ...winnerData, name: 'اطلاعات متفاوت' }), (error: unknown) => error instanceof ReservationError && error.code === 'IDEMPOTENCY_CONFLICT');
     const lateReplay = await reserveAppointment(db, keys[index], winnerData, new Date(Date.now() + 40 * 86400000));
     assert.equal(lateReplay.receipt.reference, first.receipt.reference);

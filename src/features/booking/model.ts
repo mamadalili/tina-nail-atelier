@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { isAllowedDay, readableDay, todayInTehran } from '../../lib/jalali';
-import { manicureOptions, periods, services, salon, type ManicureType, type PeriodId, type ServiceId } from '../../content/salon';
+import { manicureOptions, periods, services, salon, staffMembers, type StaffId, type ManicureType, type PeriodId, type ServiceId } from '../../content/salon';
 
-export type BookingRequest = { name: string; phone: string; service: ServiceId; manicureType: ManicureType | ''; date: string; period: PeriodId | ''; note: string; consent: boolean };
+export type BookingRequest = { name: string; phone: string; service: ServiceId; manicureType: ManicureType | ''; date: string; period: PeriodId | ''; note: string; consent: boolean; staff?: StaffId };
 export type ValidationResult = { success: true; data: BookingRequest } | { success: false; errors: Record<string, string> };
 
 export function normalizeDigits(value: string) {
@@ -23,6 +23,7 @@ export function validateRequest(input: unknown, today = todayInTehran()): Valida
     period: z.enum(periods.map(item => item.id), { error: 'یکی از بازه‌های دوساعته را انتخاب کن.' }),
     note: z.string().trim().max(500, 'توضیحات را کوتاه‌تر از ۵۰۰ حرف بنویس.').default(''),
     consent: z.boolean().refine(value => value, 'برای هماهنگی وقت، رضایت تماس را تأیید کن.'),
+    staff: z.enum(staffMembers.map(item => item.id), { error: 'تینا یا سونیا را انتخاب کن.' }).default('tina'),
   }).superRefine((data, context) => {
     if (data.service === 'manicure' && !data.manicureType) context.addIssue({ code: 'custom', path: ['manicureType'], message: 'برای مانیکور، ژلیش یا کاشت را انتخاب کن.' });
   });
@@ -51,6 +52,7 @@ export function isUpcomingPeriod(day: string, period: string, now = new Date()) 
 export function selectionErrors(data: BookingRequest, now = new Date()) {
   const errors: Record<string, string> = {};
   if (!services.some(item => item.id === data.service)) errors.service = 'یک خدمت انتخاب کن.';
+  if (data.staff !== undefined && !staffMembers.some(item => item.id === data.staff)) errors.staff = 'تینا یا سونیا را انتخاب کن.';
   if (data.service === 'manicure' && !manicureOptions.some(item => item.id === data.manicureType)) errors.manicureType = 'برای مانیکور، ژلیش یا کاشت را انتخاب کن.';
   if (!isAllowedDay(data.date, todayInTehran(now))) errors.date = 'روز دلخواهت را از تقویم انتخاب کن.';
   if (!periods.some(item => item.id === data.period)) errors.period = 'یکی از بازه‌های دوساعته را انتخاب کن.';

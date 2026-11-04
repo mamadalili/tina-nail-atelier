@@ -51,10 +51,22 @@ try {
   const bookUrl = `${origin}/tina-preview/api/booking.php`;
   const availability = await (await fetch(`${bookUrl}?date=${day}`)).json();
   assert.deepEqual(availability.taken, ['16-18']);
+  assert.deepEqual((await (await fetch(`${bookUrl}?date=${day}&staff=sonia`)).json()).taken, []);
+  assert.equal((await api('block', { date: day, period: '14-16', blocked: true, staff: 'sonia' })).status, 200);
+  assert.deepEqual((await (await fetch(`${bookUrl}?date=${day}&staff=sonia`)).json()).taken, ['14-16']);
+  assert.deepEqual((await (await fetch(`${bookUrl}?date=${day}&staff=tina`)).json()).taken, ['16-18']);
+  assert.equal((await fetch(`${bookUrl}?date=${day}&staff=other`)).status, 422);
   const data = { name: 'آزمون محلی پنل', phone: '09000000000', service: 'pedicure', manicureType: '', date: day, period: '10-12', note: '', consent: true };
   const booking = await fetch(bookUrl, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() }, body: JSON.stringify(data) });
   assert.equal(booking.status, 201);
   const reference = (await booking.json()).receipt.reference;
+  const soniaBooking = await fetch(bookUrl, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() }, body: JSON.stringify({ ...data, staff: 'sonia' }) });
+  assert.equal(soniaBooking.status, 201);
+  assert.equal((await soniaBooking.json()).receipt.staffName, 'سونیا');
+  const soniaList = await (await api(`month&month=${month}&staff=sonia`)).json();
+  assert.equal(soniaList.staff, 'sonia');
+  assert.equal(soniaList.appointments.length, 1);
+  assert.ok(soniaList.appointments.every((item: { staff: string }) => item.staff === 'sonia'));
   const list = await api(`month&month=${month}`);
   const row = (await list.json()).appointments.find((item: { reference: string }) => item.reference === reference);
   assert.ok(row && row.phone === data.phone, 'Authenticated calendar contains private appointment');
@@ -65,5 +77,6 @@ try {
   assert.deepEqual((await (await fetch(`${bookUrl}?date=${day}`)).json()).taken, []);
   assert.equal((await api('logout', {})).status, 200);
   assert.equal((await api(`month&month=${month}`)).status, 401);
-  console.log('PASS admin HTTP: private reads, Origin/CSRF, login rotation/cookies, block/public availability, edit/version/cancel and logout');
+  assert.deepEqual((await (await fetch(`${bookUrl}?date=${day}&staff=sonia`)).json()).taken, ['10-12', '14-16']);
+  console.log('PASS admin HTTP: private reads, Origin/CSRF, login cookies, independent staff booking/closures, edit/version/cancel and logout');
 } finally { child.kill(); await new Promise(resolve => child.once('exit', resolve)); await rm(root, { recursive: true, force: true }); }

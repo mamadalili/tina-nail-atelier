@@ -28,7 +28,8 @@ try{
         if($action!=='month')adminRespond(404,['message'=>'این بخش پیدا نشد.']);
         $month=$_GET['month']??'';if(!is_string($month))adminRespond(400,['message'=>'ماه معتبر انتخاب کن.']);
         $store=new BookingStore($runtime.'/data/appointments.sqlite');
-        adminRespond(200,$store->adminMonth($month));
+        $staff=$_GET['staff']??'tina';if(!is_string($staff))adminRespond(400,['message'=>'فرد معتبر انتخاب کن.']);
+        adminRespond(200,$store->adminMonth($month,$staff));
     }
     if($_SERVER['REQUEST_METHOD']!=='POST'){header('Allow: GET, POST');adminRespond(405,['message'=>'این روش درخواست مجاز نیست.']);}
     $expected=$local?'http://'.$host:'https://mrdalili.ir';
@@ -57,7 +58,8 @@ try{
     $store=new BookingStore($runtime.'/data/appointments.sqlite');$clock=new DateTimeImmutable('now',new DateTimeZone('Asia/Tehran'));
     if($action==='block'){
         if(!is_string($body['date']??null)||!is_string($body['period']??null)||!is_bool($body['blocked']??null))adminRespond(422,['message'=>'روز و ساعت معتبر انتخاب کن.']);
-        $store->setBlocked($body['date'],$body['period'],$body['blocked'],$clock);adminRespond(200,['ok'=>true]);
+        $staff=$body['staff']??'tina';if(!is_string($staff))adminRespond(422,['message'=>'فرد معتبر انتخاب کن.']);
+        $store->setBlocked($body['date'],$body['period'],$body['blocked'],$clock,$staff);adminRespond(200,['ok'=>true]);
     }
     if(!in_array($action,['update','cancel'],true))adminRespond(404,['message'=>'این بخش پیدا نشد.']);
     if(!is_string($body['reference']??null)||!preg_match('/^TN-[A-F0-9]{16,32}$/D',$body['reference'])||!is_int($body['version']??null)||$body['version']<1)adminRespond(422,['message'=>'شناسهٔ نوبت معتبر نیست.']);

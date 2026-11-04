@@ -21,6 +21,7 @@ model AppointmentRequest {
   name           String        @db.VarChar(80)
   phone          String        @db.VarChar(11)
   service        String        @db.VarChar(20)
+  staff          String        @default("tina") @db.VarChar(20)
   manicureType   String?       @db.VarChar(20)
   preferredDay   DateTime      @db.Date
   jalaliDay      String        @db.VarChar(10)
