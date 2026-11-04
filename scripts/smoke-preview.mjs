@@ -16,7 +16,7 @@ for (const path of ['/', '/privacy', '/api/health', '/robots.txt']) {
   console.log(`PASS ${path}`);
 }
 
-const picture = await fetch(new URL('/_next/image?url=%2Fimages%2Ftina-owner-portrait-v5.webp&w=640&q=85', base), { headers: { Accept: 'image/webp' } });
+const picture = await fetch(new URL('/_next/image?url=%2Fimages%2Ftina-editorial-hands-v6.webp&w=640&q=85', base), { headers: { Accept: 'image/webp' } });
 assert.equal(picture.status, 200);
 assert.match(picture.headers.get('content-type'), /image\/webp/);
 console.log(`PASS optimized hero: ${picture.headers.get('content-type')}, ${(await picture.arrayBuffer()).byteLength} bytes`);
