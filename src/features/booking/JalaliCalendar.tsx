@@ -36,6 +36,7 @@ export function JalaliCalendar({ today, selected, onSelect }: { today: string; s
       return <button key={key} type="button" className={`calendar-day${key === selected ? ' selected' : ''}${key === today ? ' today' : ''}`} disabled={!isAllowedDay(key, today)} aria-label={readableDay(key)} aria-pressed={key === selected} aria-current={key === today ? 'date' : undefined} onKeyDown={moveFocus} onClick={() => onSelect(key)}>{faNumber(day)}</button>;
     })}</div>
     <div className="calendar-compact"><label htmlFor="compact-day">روز دلخواه</label><select id="compact-day" value={selected.startsWith(`${view.year}-${String(view.month).padStart(2, '0')}`) ? selected : ''} onChange={event => onSelect(event.target.value)}><option value="" disabled>روز را انتخاب کن</option>{monthCells(view.year, view.month).filter((day): day is number => day !== null).map(day => { const key = dateKey(view.year, view.month, day); return <option key={key} value={key} disabled={!isAllowedDay(key, today)}>{readableDay(key)}</option>; })}</select></div>
+    <div className="calendar-key"><span><i aria-hidden="true" />امروز</span><span>تا ۹۰ روز آینده</span></div>
     <p className="calendar-selection" aria-live="polite">{selected ? readableDay(selected) : 'روز دلخواهت را انتخاب کن.'}</p>
   </div>;
 }

@@ -26,12 +26,10 @@ export default function Home() {
       <section id="booking" className="booking-section section" aria-labelledby="booking-title">
         <div className="wrap booking-layout">
           <div className="booking-intro">
-            <span className="section-kicker" lang="en" dir="ltr">A little time for you.</span>
-            <h2 id="booking-title">یک وقت،<br /><em>فقط برای تو.</em></h2>
-            <p>از اینجا شروع کنیم؛ خدمت، روز و ساعت دلخواهت را انتخاب کن. بعد، برای هماهنگی جزئیات با تو در تماسیم.</p>
-            <div className="booking-context"><Icon name="calendar" size={20} /><span>ساعت‌ها به وقت تهران</span></div>
-            <p className="booking-note">چهار بازهٔ دوساعته، از ۱۰ صبح تا ۶ عصر.<br />این فرم درخواست وقت است؛ نوبتت پس از هماهنگی با تینا نهایی می‌شود.</p>
-            <a className="booking-phone" href={salon.phoneLink}><Icon name="phone" />هماهنگی تلفنی با تینا<span dir="ltr">۰۹۳۵ ۳۱۵ ۵۸۵۲</span></a>
+            <div><span className="section-kicker" lang="en" dir="ltr">A little time for you.</span>
+            <h2 id="booking-title">یک وقت، <em>فقط برای تو.</em></h2>
+            <p>خدمت، روز و ساعت دلخواهت را انتخاب کن؛ برای نهایی‌کردن وقت با تو هماهنگ می‌کنیم.</p></div>
+            <a className="booking-phone" href={salon.phoneLink}><span className="booking-phone-icon"><Icon name="phone" size={20} /></span><span>هماهنگی تلفنی<strong dir="ltr">۰۹۳۵ ۳۱۵ ۵۸۵۲</strong></span></a>
           </div>
           <BookingFrame><BookingForm today={todayInTehran(now)} initialNow={now.toISOString()} serverEnabled={serverBooking} /></BookingFrame>
         </div>

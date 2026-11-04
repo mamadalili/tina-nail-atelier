@@ -4,6 +4,12 @@ Reading this as: a Persian nail atelier and appointment website with a cinematic
 
 ## Current direction — revision 6
 
+### Booking refinement, 4 November 2026
+
+The appointment section now uses a compact introduction and a wide, flat selection panel instead of a tall sidebar. Service, calendar and time occupy distinct columns on wide screens; intermediate screens put service selection above the calendar/time pair. Phones stack the task with 10px outer gutters and 12px inner padding. A persistent-in-the-form recap makes the selected day and time visible beside the continuation action. Selection states use the existing green; the next action retains burgundy. These choices give the appointment task more room without adding imagery, effects, packages or claims of real-time availability.
+
+Design and verification: `docs/superpowers/specs/2026-11-04-booking-panel-design.md`, `docs/verification-booking-panel.md`.
+
 The owner's latest rebranding brief supersedes the earlier face-led and dark-hero requirements below. Use the five new website screenshots as composition references, not source assets.
 
 - Light gray `#e9ebe8` is the main canvas; soft white `#f7f8f6` defines the appointment surface. Imperial green `#164c3c` carries the identity, selection states and contact chapter. Burgundy `#75283e` identifies primary booking actions and lacquer.

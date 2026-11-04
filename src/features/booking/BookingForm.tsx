@@ -97,6 +97,10 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
     setStep(result.errors.date || result.errors.period || result.errors.manicureType ? 0 : 1);
   }
 
+  const selectedService = services.find(item => item.id === data.service)!;
+  const selectedTreatment = data.service === 'manicure' ? manicureOptions.find(item => item.id === data.manicureType)?.label : '';
+  const selectedPeriod = isUpcomingPeriod(data.date, data.period, clockNow) ? periods.find(item => item.id === data.period) : undefined;
+
   if (step === 2) return <div className="booking-sheet booking-result" role="region" aria-labelledby="booking-result-title">
     <span className="result-mark"><Icon name="check" size={30} /></span>
     <h3 id="booking-result-title" ref={formHeading} tabIndex={-1}>{saved ? 'درخواستت ثبت شد.' : 'پیامت آمادهٔ ارسال است.'}</h3>
@@ -114,17 +118,27 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
 
   return <form className="booking-sheet" onSubmit={submit} noValidate>
     <ol className="form-steps" aria-label="مراحل درخواست وقت"><li aria-current={step === 0 ? 'step' : undefined} className={step > 0 ? 'is-complete' : ''}><span aria-hidden="true">۱</span>خدمت و زمان</li><li aria-current={step === 1 ? 'step' : undefined}><span aria-hidden="true">۲</span>اطلاعات تماس</li></ol>
-    <div className="form-heading"><h3 ref={formHeading} tabIndex={-1}>{step === 0 ? 'وقت دلخواهت را انتخاب کن' : 'چطور با تو هماهنگ کنیم؟'}</h3><span>{step === 0 ? 'مرحلهٔ ۱ از ۲' : 'مرحلهٔ ۲ از ۲'}</span></div>
+    <div className="form-heading"><h3 ref={formHeading} tabIndex={-1}>{step === 0 ? 'وقت دلخواهت را انتخاب کن' : 'چطور با تو هماهنگ کنیم؟'}</h3><span><Icon name="calendar" size={16} />نوبت‌های دوساعته · به وقت تهران</span></div>
     <p className="form-validation" role="alert" hidden={!Object.keys(errors).length}>{Object.values(errors).join(' ')}</p>
     <fieldset disabled={pending} aria-busy={pending} className="booking-fields">
     {step === 0 ? <>
-      <fieldset className="service-choice"><legend>برای چه خدمتی؟</legend><div className="choice-row">{services.map(item => <label className={data.service === item.id ? 'choice selected' : 'choice'} key={item.id}><input type="radio" name="service" value={item.id} checked={data.service === item.id} onChange={() => change('service', item.id)} />{item.name}</label>)}</div></fieldset>
-      {data.service === 'manicure' && <fieldset className="manicure-choice" aria-describedby={errors.manicureType ? 'manicure-error' : undefined}><legend>ژلیش یا کاشت؟</legend><div className="choice-row">{manicureOptions.map(item => <label className={data.manicureType === item.id ? 'choice selected' : 'choice'} key={item.id}><input type="radio" name="manicureType" value={item.id} checked={data.manicureType === item.id} onChange={() => change('manicureType', item.id)} />{item.label}</label>)}</div>{errors.manicureType && <p className="field-error" id="manicure-error">{errors.manicureType}</p>}</fieldset>}
-      <JalaliCalendar today={currentToday} selected={data.date} onSelect={key => change('date', key)} />
-      {errors.date && <p className="field-error" role="alert">{errors.date}</p>}
-      <fieldset className="period-choice" aria-describedby={errors.period ? 'period-error' : 'period-hint'}><legend>چه ساعتی؟ <span className="duration-note">هر نوبت ۲ ساعت</span></legend><div className="time-grid">{periods.map(item => <label className={data.period === item.id ? 'choice time-choice selected' : 'choice time-choice'} key={item.id}><input type="radio" name="period" value={item.id} aria-label={`ساعت ${item.label}`} checked={data.period === item.id} disabled={!isUpcomingPeriod(data.date, item.id, clockNow)} onChange={() => change('period', item.id)} /><Icon name="calendar" size={17} /><span>{item.label}</span></label>)}</div><p id="period-hint" className="time-hint">{!data.date ? 'اول روز دلخواهت را از تقویم انتخاب کن.' : isAllowedDay(data.date, currentToday) && periods.every(item => !isUpcomingPeriod(data.date, item.id, clockNow)) ? 'بازه‌های امروز تمام شده‌اند؛ روز دیگری انتخاب کن.' : 'ساعت‌ها به وقت تهران هستند.'}</p>{errors.period && <p className="field-error" id="period-error">{errors.period}</p>}</fieldset>
-      <button type="button" className="button primary full booking-cta" onClick={nextStep}>ادامه و ثبت اطلاعات <Icon name="arrow" size={20} /></button>
-      <p className="form-disclaimer">روز انتخابی، پیشنهاد توست؛ زمان نهایی را هماهنگ می‌کنیم.</p>
+      <div className="booking-selection">
+        <div className="treatment-panel">
+          <fieldset className="service-choice"><legend>انتخاب خدمت</legend><div className="choice-row">{services.map(item => <label className={`choice service-option${data.service === item.id ? ' selected' : ''}`} key={item.id}><input type="radio" name="service" value={item.id} aria-label={item.name} checked={data.service === item.id} onChange={() => change('service', item.id)} /><span><strong>{item.name}</strong><small>{item.subtitle}</small></span><span className="service-radio" aria-hidden="true">{data.service === item.id && <Icon name="check" size={14} />}</span></label>)}</div></fieldset>
+          {data.service === 'manicure' && <fieldset className="manicure-choice" aria-describedby={errors.manicureType ? 'manicure-error' : undefined}><legend>نوع مانیکور</legend><div className="choice-row">{manicureOptions.map(item => <label className={data.manicureType === item.id ? 'choice selected' : 'choice'} key={item.id}><input type="radio" name="manicureType" value={item.id} checked={data.manicureType === item.id} aria-invalid={Boolean(errors.manicureType)} onChange={() => change('manicureType', item.id)} />{item.label}</label>)}</div>{errors.manicureType && <p className="field-error" id="manicure-error">{errors.manicureType}</p>}</fieldset>}
+          <p className="treatment-note">اگر مدل یا طرحی در ذهن داری، در مرحلهٔ بعد برایم بنویس.</p>
+        </div>
+        <div className="date-panel" role="group" aria-labelledby="visit-day-title">
+          <h4 id="visit-day-title" className="selection-label">روز مراجعه</h4>
+          <JalaliCalendar today={currentToday} selected={data.date} onSelect={key => change('date', key)} />
+          {errors.date && <p className="field-error" role="alert">{errors.date}</p>}
+        </div>
+        <fieldset className="period-choice" aria-describedby={errors.period ? 'period-error' : 'period-hint'}><legend>ساعت مراجعه <span className="duration-note">۲ ساعت</span></legend><div className="time-grid">{periods.map(item => <label className={data.period === item.id ? 'choice time-choice selected' : 'choice time-choice'} key={item.id}><input type="radio" name="period" value={item.id} aria-label={`ساعت ${item.label}`} checked={data.period === item.id} disabled={!isUpcomingPeriod(data.date, item.id, clockNow)} onChange={() => change('period', item.id)} /><span>{item.label}</span><Icon name="check" size={17} /></label>)}</div><p id="period-hint" className="time-hint">{!data.date ? 'اول روز دلخواهت را انتخاب کن تا ساعت‌ها فعال شوند.' : isAllowedDay(data.date, currentToday) && periods.every(item => !isUpcomingPeriod(data.date, item.id, clockNow)) ? 'بازه‌های امروز تمام شده‌اند؛ روز دیگری انتخاب کن.' : 'بازهٔ مناسب خودت را انتخاب کن.'}</p>{errors.period && <p className="field-error" id="period-error">{errors.period}</p>}<p className="slot-note">زمان نهایی پس از هماهنگی تأیید می‌شود.</p></fieldset>
+      </div>
+      <div className="booking-next">
+        <div className="selection-recap" aria-live="polite"><strong>{selectedService.name}{selectedTreatment ? ` · ${selectedTreatment}` : ''}</strong><span>{data.date ? readableDay(data.date) : 'روز را انتخاب کن'}<span aria-hidden="true"> · </span>{selectedPeriod ? `ساعت ${selectedPeriod.label}` : 'ساعت را انتخاب کن'}</span></div>
+        <button type="button" className="button primary booking-cta" onClick={nextStep}>ادامه و ثبت اطلاعات <Icon name="arrow" size={20} /></button>
+      </div>
     </> : <>
       <div className="selected-appointment"><span>{services.find(item => item.id === data.service)!.name}{data.service === 'manicure' ? ` · ${manicureOptions.find(item => item.id === data.manicureType)?.label}` : ''}</span><span>{readableDay(data.date)}</span><span>ساعت {periods.find(item => item.id === data.period)?.label}</span><button className="text-button" type="button" onClick={() => setStep(0)}>تغییر وقت</button></div>
       <div className="fields-grid"><div className="field"><label htmlFor="name">نام و نام خانوادگی</label><input id="name" name="name" autoComplete="name" value={data.name} maxLength={80} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} onChange={event => change('name', event.target.value)} placeholder="نامت را بنویس" />{errors.name && <p id="name-error" className="field-error">{errors.name}</p>}</div><div className="field"><label htmlFor="phone">شمارهٔ موبایل</label><input id="phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={data.phone} maxLength={20} aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? 'phone-error' : undefined} onChange={event => change('phone', event.target.value)} placeholder="09..." />{errors.phone && <p id="phone-error" className="field-error">{errors.phone}</p>}</div></div>
