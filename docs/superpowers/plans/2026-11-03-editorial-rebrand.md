@@ -56,8 +56,10 @@
 - [x] Run `npm test`, `npm run typecheck`, `npm run build` on Node 24.11; expect exit 0.
 - [x] Run production smoke checks; review 320/390/768/1440 layouts, keyboard, motion and privacy page.
 - [x] Record evidence and limitations, obtain independent code review and address material findings.
-- [ ] Commit and push `codex/tina-editorial-rebrand`, open a reviewable PR.
+- [x] Commit and push `codex/tina-editorial-rebrand`, open a reviewable PR.
 
 Visual/copy changes use browser verification rather than new tests that merely assert implementation strings. Existing business-logic tests remain the regression suite.
 
 Execution notes: the fixed phone action now appears only outside the hero and booking section; invalid submission focuses the first invalid contact field and exposes a visible error summary. Both were reproduced before correction and verified in browser afterwards. Production booking/edit/service-transfer was also verified. Strict 200% zoom and OS reduced-motion emulation remain documented verification limits.
+
+Delivery: [Pull request #1](https://github.com/mamadalili/tina-nail-atelier/pull/1), open against `main`.

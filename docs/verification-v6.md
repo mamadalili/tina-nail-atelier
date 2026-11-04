@@ -42,3 +42,5 @@ The deployed VPS/database and notification services were not configured or conta
 Reduced-motion CSS was reviewed: nonessential animation and transitions are disabled and reveal content is shown. The browser's actual OS preference was no-preference; OS-level reduced-motion and strict 200% zoom emulation were not changed or separately automated. Browser screenshots and layout measurements cover the viewport sizes listed above.
 
 Source changes are delivered on `codex/tina-editorial-rebrand` for review against `main`; this task does not change the project's VPS deployment model.
+
+Delivery: [Pull request #1](https://github.com/mamadalili/tina-nail-atelier/pull/1). The application source commit is `144cfb6`; the subsequent commit records delivery documentation only.
