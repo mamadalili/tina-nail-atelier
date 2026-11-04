@@ -15,7 +15,7 @@ import { MobileBookingLink } from '@/components/MobileBookingLink';
 export const dynamic = 'force-dynamic';
 
 export default function Home() {
-  const serverBooking = Boolean(process.env.DATABASE_URL && process.env.BOOKING_ENABLED === 'true');
+  const serverBooking = process.env.NEXT_PUBLIC_BOOKING_ADAPTER === 'shared-host' || Boolean(process.env.DATABASE_URL && process.env.BOOKING_ENABLED === 'true');
   const now = new Date();
   return <>
     <a className="skip-link" href="#main">رفتن به محتوای اصلی</a>

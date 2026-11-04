@@ -9,6 +9,7 @@ import { isUpcomingPeriod, selectionErrors, validateSubmission, type BookingRequ
 import { JalaliCalendar } from './JalaliCalendar';
 import { BookingReceipt } from './BookingReceipt';
 import { receiptSchema, type BookingReceiptData } from './receipt-model';
+import { bookingApi, bookingFailureErrors } from './transport';
 
 export function BookingForm({ today, initialNow, serverEnabled }: { today: string; initialNow: string; serverEnabled: boolean }) {
   const [step, setStep] = useState(0);
@@ -52,11 +53,13 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
     if (!data.date || !serverEnabled || receipt) { setAvailability('idle'); return; }
     const controller = new AbortController();
     setAvailability('loading');
-    fetch(`/api/availability?date=${encodeURIComponent(data.date)}`, { cache: 'no-store', signal: controller.signal })
+    const timeout = window.setTimeout(() => controller.abort('timeout'), 15000);
+    fetch(bookingApi.availability(data.date), { cache: 'no-store', signal: controller.signal })
       .then(async response => { const body = await response.json(); if (!response.ok || body.date !== data.date || !Array.isArray(body.taken) || body.taken.some((id: unknown) => !periods.some(period => period.id === id))) throw new Error('AVAILABILITY_FAILED'); return body.taken as string[]; })
       .then(values => { if (!controller.signal.aborted) { setTaken(values); setAvailability('ready'); } })
-      .catch(() => { if (!controller.signal.aborted) setAvailability('error'); });
-    return () => controller.abort();
+      .catch(() => { if (!controller.signal.aborted || controller.signal.reason === 'timeout') setAvailability('error'); })
+      .finally(() => window.clearTimeout(timeout));
+    return () => { window.clearTimeout(timeout); controller.abort(); };
   }, [data.date, serverEnabled, receipt, availabilityRefresh]);
 
   useEffect(() => {
@@ -101,10 +104,10 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
     setPending(true); setErrors({});
     try {
       token.current ??= crypto.randomUUID();
-      const response = await fetch('/api/appointment-requests', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': token.current }, body: JSON.stringify(result.success ? result.data : data) });
+      const response = await fetch(bookingApi.appointment, { method: 'POST', signal: AbortSignal.timeout(20000), headers: { 'Content-Type': 'application/json', 'Idempotency-Key': token.current }, body: JSON.stringify(result.success ? result.data : data) });
       const body = await response.json();
       if (!response.ok) {
-        setErrors(body.errors ?? { form: body.message ?? 'ثبت نوبت انجام نشد. دوباره تلاش کن.' });
+        setErrors(bookingFailureErrors(body));
         if (body.errors?.date || body.errors?.period || body.errors?.manicureType) { setStep(0); setCurrentToday(todayInTehran()); setClockNow(new Date()); }
         if (body.code === 'SLOT_TAKEN') { setData(current => ({ ...current, period: '' })); setAvailabilityRefresh(current => current + 1); token.current = null; }
         if (body.code === 'IDEMPOTENCY_CONFLICT') token.current = null;
@@ -121,7 +124,7 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
   const selectedTreatment = data.service === 'manicure' ? manicureOptions.find(item => item.id === data.manicureType)?.label : '';
   const selectedPeriod = isUpcomingPeriod(data.date, data.period, clockNow) ? periods.find(item => item.id === data.period) : undefined;
 
-  if (receipt) return <BookingReceipt receipt={receipt} headingRef={formHeading} />;
+  if (receipt) return <BookingReceipt receipt={receipt} headingRef={formHeading} notificationsDisabled={process.env.NEXT_PUBLIC_BOOKING_ADAPTER === 'shared-host'} />;
 
   return <form className="booking-sheet" onSubmit={submit} noValidate>
     <ol className="form-steps" aria-label="مراحل درخواست وقت"><li aria-current={step === 0 ? 'step' : undefined} className={step > 0 ? 'is-complete' : ''}><span aria-hidden="true">۱</span>خدمت و زمان</li><li aria-current={step === 1 ? 'step' : undefined}><span aria-hidden="true">۲</span>اطلاعات تماس</li></ol>

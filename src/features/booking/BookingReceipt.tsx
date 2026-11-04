@@ -7,7 +7,7 @@ import { faNumber, months } from '@/lib/jalali';
 import type { BookingReceiptData } from './receipt-model';
 import './receipt.css';
 
-export function BookingReceipt({ receipt, preview = false, headingRef }: { receipt: BookingReceiptData; preview?: boolean; headingRef?: Ref<HTMLHeadingElement> }) {
+export function BookingReceipt({ receipt, preview = false, headingRef, notificationsDisabled = false }: { receipt: BookingReceiptData; preview?: boolean; headingRef?: Ref<HTMLHeadingElement>; notificationsDisabled?: boolean }) {
   const [year, month, day] = receipt.date.split('-').map(Number);
   const weekday = new Intl.DateTimeFormat('fa-IR', { timeZone: 'Asia/Tehran', weekday: 'long' }).format(new Date(receipt.startsAt));
   return <div className="receipt-experience" role="region" aria-label="رسید نوبت">
@@ -25,5 +25,6 @@ export function BookingReceipt({ receipt, preview = false, headingRef }: { recei
     </article>
     <div className="receipt-actions"><button type="button" className="button primary" onClick={() => window.print()}>چاپ یا ذخیرهٔ PDF</button><a href={salon.phoneLink}>تغییر وقت؟ تماس با تینا <Icon name="phone" size={17} /></a></div>
     <p className="receipt-save-hint">می‌توانی از همین رسید اسکرین‌شات بگیری.</p>
+    {notificationsDisabled && <p className="receipt-save-hint">فعلاً پیامک ارسال نمی‌شود؛ رسید نوبتت را نگه دار.</p>}
   </div>;
 }

@@ -9,4 +9,5 @@ src/generated/
 coverage/
 .data/
 artifacts/
+deploy/shared-host/runtime/data/
 deploy/certbot/
