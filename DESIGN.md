@@ -4,6 +4,10 @@ Reading this as: a Persian nail atelier and appointment website with a cinematic
 
 ## Current direction — revision 6
 
+### Confirmed appointment pass, 4 November 2026
+
+The owner now chooses automatic confirmation for empty slots and backend-only notifications. The older manual-request/WhatsApp handoff notes below are superseded. A confirmed server response renders a keepable ticket with an imperial-green masthead, large Persian date, guest/service details and full tracking reference. A perforated stub and edge cutouts communicate a saved appointment pass; no decorative QR or barcode pretends to verify it. Native print produces only the ticket on one A5 page. The separately gated sample is visibly labeled and never creates a booking. Provider setup and message delivery remain server concerns.
+
 ### Booking refinement, 4 November 2026
 
 The appointment section now uses a compact introduction and a wide, flat selection panel instead of a tall sidebar. Service, calendar and time occupy distinct columns on wide screens; intermediate screens put service selection above the calendar/time pair. Phones stack the task with 10px outer gutters and 12px inner padding. A persistent-in-the-form recap makes the selected day and time visible beside the continuation action. Selection states use the existing green; the next action retains burgundy. These choices give the appointment task more room without adding imagery, effects, packages or claims of real-time availability.

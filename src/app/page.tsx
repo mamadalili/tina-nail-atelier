@@ -28,7 +28,7 @@ export default function Home() {
           <div className="booking-intro">
             <div><span className="section-kicker" lang="en" dir="ltr">A little time for you.</span>
             <h2 id="booking-title">یک وقت، <em>فقط برای تو.</em></h2>
-            <p>خدمت، روز و ساعت دلخواهت را انتخاب کن؛ برای نهایی‌کردن وقت با تو هماهنگ می‌کنیم.</p></div>
+            <p>خدمت، روز و ساعت خالی را انتخاب کن؛ نوبتت را رزرو کن و رسیدش را همین‌جا بگیر.</p></div>
             <a className="booking-phone" href={salon.phoneLink}><span className="booking-phone-icon"><Icon name="phone" size={20} /></span><span>هماهنگی تلفنی<strong dir="ltr">۰۹۳۵ ۳۱۵ ۵۸۵۲</strong></span></a>
           </div>
           <BookingFrame><BookingForm today={todayInTehran(now)} initialNow={now.toISOString()} serverEnabled={serverBooking} /></BookingFrame>
@@ -37,7 +37,7 @@ export default function Home() {
 
       <section id="services" className="services-section wrap section" aria-labelledby="services-title">
         <Reveal><div className="section-heading"><div><span className="section-kicker" lang="en" dir="ltr">The atelier menu</span><h2 id="services-title">جزئیات کوچک.<br /><span className="subtle">انتخاب‌های شخصی.</span></h2></div><p>از یک مانیکور ساده تا انتخاب رنگ و طراحی ناخن؛<br />خدمتی که می‌خواهی را انتخاب کن.</p></div><ServiceIndex /></Reveal>
-        <p className="service-footnote">برای تعرفه و جزئیات هر خدمت، قبل از نهایی‌شدن وقت در واتس‌اپ هماهنگ می‌کنیم.</p>
+        <p className="service-footnote">برای پرسیدن تعرفه یا جزئیات طراحی، پیش از رزرو با تینا تماس بگیر.</p>
       </section>
 
       <section id="colour" className="colour-section" aria-labelledby="colour-heading">

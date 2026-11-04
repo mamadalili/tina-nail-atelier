@@ -15,6 +15,7 @@ enum RequestStatus {
 
 model AppointmentRequest {
   id             String        @id @default(uuid()) @db.Uuid
+  reference      String        @unique @db.VarChar(40)
   idempotencyKey String        @unique @db.Uuid
   payloadHash    String
   name           String        @db.VarChar(80)
@@ -44,6 +45,8 @@ model OutboxEvent {
   channel     String             @db.VarChar(20)
   kind        String             @db.VarChar(20)
   sentAt      DateTime?
+  providerMessageId String?    @db.VarChar(255)
+  skippedAt   DateTime?
   attempts    Int                @default(0)
   retryAt     DateTime           @default(now())
   createdAt   DateTime           @default(now())

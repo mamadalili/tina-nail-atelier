@@ -175,7 +175,10 @@
   .time-grid .time-choice { min-height: 52px; gap: 8px; justify-content: space-between; font-weight: 550; }
   .time-choice > svg { opacity: 0; flex-shrink: 0; }
   .time-choice.selected > svg { opacity: 1; }
+  .time-choice small { display: block; font-size: .68rem; font-weight: 400; }
   .time-hint { margin-top: 12px; font-size: .8rem; color: var(--muted); }
+  .booking-offline { margin-bottom: 20px; padding: 12px; color: var(--red); background: var(--red-soft); border-radius: var(--radius); font-size: .85rem; }
+  .booking-offline a { text-decoration: underline; text-underline-offset: 4px; }
   .slot-note { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: .76rem; }
   .booking-next { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding-top: 20px; margin-top: 24px; border-top: 1px solid var(--line); }
   .selection-recap { display: grid; gap: 5px; }
