@@ -1,6 +1,18 @@
 # Image provenance
 
-Image history: earlier artwork used the built-in image generation tool. The current hero uses the owner's exact newly supplied file, converted directly to WebP. Reference originals are preserved privately. No CLI/API key was used.
+The current hero is an original conceptual campaign image created with the built-in image generation tool. It illustrates the atelier's art direction rather than Tina's identity or client results. The owner's exact prior portrait remains unchanged. No CLI/API key was used.
+
+## Current hero — editorial rebrand, revision 6
+
+Public asset: `public/images/tina-editorial-hands-v6.webp`, 1122 × 1402. Generated with the built-in imagegen tool, then converted to WebP with Sharp, quality 88 / effort 6, without resizing or changing its composition. The original generated PNG remains in the task's generated image directory. The five supplied screenshots were visual direction only: no reference people's likeness, logo, content or screenshot pixels are copied into the site.
+
+The image was inspected for plausible hand anatomy, manicure detail, subdued face, gray background and controlled light. The live page crops the photograph responsively and blends its right edge into the gray canvas. Its alt text and caption identify it as a conceptual atelier image. The previous `tina-owner-portrait-v5.webp` is retained unmodified.
+
+Final prompt used:
+
+> Use case: photorealistic-natural. Asset type: original editorial beauty photograph for the hero of Tina, an independent Persian nail atelier. Create a single extraordinarily refined cinematic fashion-beauty photograph, portrait 4:5 composition, no lettering, no logos, no website mockup. A tightly cropped woman's graceful hand and forearm with impeccable long soft-almond glossy deep burgundy nails is the protagonist. The hand is raised across part of an anonymous woman's face, artfully obscuring most facial identity; only part of a cheek, closed eye and jaw is softly discernible in shadow, no front-facing glamour portrait. Elegant natural hand anatomy, five fingers, believable precise manicure. Black sculptural silk clothing below. Quiet neutral LIGHT COOL GRAY plaster background, a broad circular beam of studio light falling across the backdrop and part of the hand like a cinematic spotlight. Strong chiaroscuro, silver side lighting, soft tactile film grain, almost black-and-white skin, restrained selective wine-red nail lacquer, a hint of deep imperial forest green in the far shadows. Desaturated, sculptural, expensive art-book photography. Forearm rises diagonally from the lower left toward the center; nails and fingertips around upper center-left are tack sharp, cheek and outer edges gently fall into optical blur and shadow. Subject fills frame with deliberate negative space on the top and right, not a small portrait framed in empty space. Background should stay predominantly light cool gray, not a black background. Avoid jewelry, flowers, props, sparkles, plastic skin, glossy advertising stock-photo look, nudity, red background, gold, busy patterns, additional hands, extra fingers, any text or watermark. This is a conceptual campaign image, not a documentary portrait of the real owner.
+
+Supporting color study: `public/images/burgundy-colour-study.webp` is a quality-88 WebP conversion of the existing `burgundy-colour-study.png`, with the same 1536 × 1024 pixels. The PNG and the owner's prior WebP are retained. Earlier provenance below is historical.
 
 ## Current hero, owner's supplied image, revision 5
 

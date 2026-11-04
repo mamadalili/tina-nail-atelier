@@ -3,10 +3,9 @@
 import { useState } from 'react';
 
 const colours = [
-  { name: 'زرشکی', english: 'Burgundy', hex: '#7b122b', note: 'عمیق و براق؛ یک رنگِ کامل برای وقتی که جزئیات حرف می‌زنند.' },
-  { name: 'صورتی صدفی', english: 'Pearl rose', hex: '#b77983', note: 'آرام و روشن؛ برای وقتی که رنگی نزدیک‌تر به حال‌وهوای طبیعی دوست داری.' },
-  { name: 'موکا', english: 'Mocha', hex: '#826454', note: 'گرم و خنثی؛ انتخابی برای کنار هم گذاشتن با رنگ‌های روزمره.' },
-  { name: 'مشکی', english: 'Ink', hex: '#242323', note: 'ساده و مشخص؛ برای فرمی که خودش دیده می‌شود.' },
+  { name: 'سبز سلطنتی', english: 'Imperial green', hex: '#164c3c', note: 'عمیق، آرام و کمی متفاوت؛ برای جزئیاتی که لازم نیست بلند حرف بزنند.' },
+  { name: 'زرشکی', english: 'Burgundy', hex: '#75283e', note: 'غنی و کلاسیک؛ رنگی که حتی در ساده‌ترین فرم هم دیده می‌شود.' },
+  { name: 'طوسی مرواریدی', english: 'Pearl grey', hex: '#a9b0aa', note: 'روشن و مینیمال؛ برای وقتی که فرم ناخن را به رنگ ترجیح می‌دهی.' },
 ];
 
 export function ColourStudy() {

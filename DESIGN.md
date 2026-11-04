@@ -1,6 +1,20 @@
 # Tina Hosseinzadeh, nail atelier
 
-Reading this as: a Persian nail atelier and appointment website for people choosing a personal nail artist, in a luxury fashion-editorial visual language. ENERGY 3 / RHYTHM 3 / MOTION 2.
+Reading this as: a Persian nail atelier and appointment website with a cinematic, hand-led editorial identity. Light gray dominates, supported by imperial green and burgundy. ENERGY 3 / RHYTHM 3 / MOTION 2.
+
+## Current direction — revision 6
+
+The owner's latest rebranding brief supersedes the earlier face-led and dark-hero requirements below. Use the five new website screenshots as composition references, not source assets.
+
+- Light gray `#e9ebe8` is the main canvas; soft white `#f7f8f6` defines the appointment surface. Imperial green `#164c3c` carries the identity, selection states and contact chapter. Burgundy `#75283e` identifies primary booking actions and lacquer.
+- A large original conceptual campaign photograph centers the hand and manicure. Cropping, silver light, restrained grain and a subdued face establish the cinematic mood. It is not a portrait of Tina and is not client work. The original owner portrait remains unchanged for future use.
+- The gray hero combines Persian hierarchy with a large Cormorant photographic caption. The header, appointment section, services and footer share flat surfaces, fine rules and consistent controls.
+- Keep local Persian typography, comfortable reading sizes, visible focus, RTL direction and 44px minimum interaction targets. Small phones use a native date selector when seven 44px day targets will not fit.
+- Booking follows the hero immediately. Name the two steps, keep selections visible and retain honest request/confirmation semantics.
+- Remove looping CTA sheen, traveling border light and stacked glass treatments. Reserve optical effects for imagery and brief motion for meaningful feedback. Respect reduced-motion preferences.
+- The interactive color study previews the same green, burgundy and pearl-gray palette. The existing supporting still life is converted to WebP without visual changes.
+
+Applied guidance and implementation boundaries are recorded in [the rebrand spec](docs/superpowers/specs/2026-11-03-editorial-rebrand-design.md). Earlier revisions below are historical context, not current visual requirements.
 
 ## Owner's brief
 

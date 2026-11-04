@@ -21,6 +21,7 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
   const token = useRef<string | null>(null);
   const formHeading = useRef<HTMLHeadingElement>(null);
   const previousStep = useRef(0);
+  const focusInvalid = useRef(false);
 
   useEffect(() => {
     if (previousStep.current === step) return;
@@ -28,6 +29,14 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
     formHeading.current?.focus();
     formHeading.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
   }, [step]);
+
+  useEffect(() => {
+    if (!focusInvalid.current) return;
+    focusInvalid.current = false;
+    const target = formHeading.current?.closest('form')?.querySelector<HTMLElement>('[aria-invalid="true"]') ?? formHeading.current;
+    target?.focus();
+    target?.scrollIntoView({ block: 'center', behavior: 'instant' });
+  }, [errors, step]);
 
   useEffect(() => {
     const select = (event: Event) => { if (pending || saved) return; const service = (event as CustomEvent).detail as ServiceId; if (services.some(item => item.id === service)) { setData(current => ({ ...current, service, manicureType: service === 'manicure' ? current.manicureType : '' })); setErrors({}); token.current = null; setStep(0); } };
@@ -55,7 +64,7 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
     const now = new Date();
     setCurrentToday(todayInTehran(now)); setClockNow(now);
     const problems = selectionErrors(data, now);
-    if (Object.keys(problems).length) { setErrors(problems); formHeading.current?.focus(); formHeading.current?.scrollIntoView({ block: 'start', behavior: 'instant' }); return; }
+    if (Object.keys(problems).length) { focusInvalid.current = true; setErrors(problems); return; }
     setErrors({}); setStep(1);
   }
 
@@ -64,7 +73,7 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
     if (pending || saved) return;
     setCurrentToday(todayInTehran());
     const result = validateSubmission(data);
-    if (!result.success) { setErrors(result.errors); if (result.errors.date || result.errors.period || result.errors.manicureType) setStep(0); return; }
+    if (!result.success) { focusInvalid.current = true; setErrors(result.errors); if (result.errors.date || result.errors.period || result.errors.manicureType) setStep(0); return; }
     setData(result.data);
     if (useWhatsapp) { setSaved(false); setStep(2); return; }
     setPending(true); setErrors({});
@@ -104,9 +113,9 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
   </div>;
 
   return <form className="booking-sheet" onSubmit={submit} noValidate>
-    <div className="form-heading"><h3 ref={formHeading} tabIndex={-1}>{step === 0 ? 'وقت دلخواهت را انتخاب کن' : 'چطور با تو هماهنگ کنیم؟'}</h3><span>{step === 0 ? 'خدمت، روز و ساعت' : 'اطلاعات تماس'}</span></div>
-    <div className="form-progress" aria-hidden="true"><span className="complete" /><span className={step === 1 ? 'complete' : ''} /></div>
-    <p className="sr-only" role="alert">{Object.values(errors).join(' ')}</p>
+    <ol className="form-steps" aria-label="مراحل درخواست وقت"><li aria-current={step === 0 ? 'step' : undefined} className={step > 0 ? 'is-complete' : ''}><span aria-hidden="true">۰۱</span>خدمت و زمان</li><li aria-current={step === 1 ? 'step' : undefined}><span aria-hidden="true">۰۲</span>اطلاعات تماس</li></ol>
+    <div className="form-heading"><h3 ref={formHeading} tabIndex={-1}>{step === 0 ? 'وقت دلخواهت را انتخاب کن' : 'چطور با تو هماهنگ کنیم؟'}</h3><span>{step === 0 ? 'مرحلهٔ ۱ از ۲' : 'مرحلهٔ ۲ از ۲'}</span></div>
+    <p className="form-validation" role="alert" hidden={!Object.keys(errors).length}>{Object.values(errors).join(' ')}</p>
     <fieldset disabled={pending} aria-busy={pending} className="booking-fields">
     {step === 0 ? <>
       <fieldset className="service-choice"><legend>برای چه خدمتی؟</legend><div className="choice-row">{services.map(item => <label className={data.service === item.id ? 'choice selected' : 'choice'} key={item.id}><input type="radio" name="service" value={item.id} checked={data.service === item.id} onChange={() => change('service', item.id)} />{item.name}</label>)}</div></fieldset>
@@ -119,9 +128,9 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
     </> : <>
       <div className="selected-appointment"><span>{services.find(item => item.id === data.service)!.name}{data.service === 'manicure' ? ` · ${manicureOptions.find(item => item.id === data.manicureType)?.label}` : ''}</span><span>{readableDay(data.date)}</span><span>ساعت {periods.find(item => item.id === data.period)?.label}</span><button className="text-button" type="button" onClick={() => setStep(0)}>تغییر وقت</button></div>
       <div className="fields-grid"><div className="field"><label htmlFor="name">نام و نام خانوادگی</label><input id="name" name="name" autoComplete="name" value={data.name} maxLength={80} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} onChange={event => change('name', event.target.value)} placeholder="نامت را بنویس" />{errors.name && <p id="name-error" className="field-error">{errors.name}</p>}</div><div className="field"><label htmlFor="phone">شمارهٔ موبایل</label><input id="phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={data.phone} maxLength={20} aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? 'phone-error' : undefined} onChange={event => change('phone', event.target.value)} placeholder="09..." />{errors.phone && <p id="phone-error" className="field-error">{errors.phone}</p>}</div></div>
-      <div className="field"><label htmlFor="note">چیزی هست که قبل از وقتت بدانم؟ <span>(اختیاری)</span></label><textarea id="note" name="note" rows={3} maxLength={500} value={data.note} onChange={event => change('note', event.target.value)} placeholder="مثلاً مدل یا رنگ دلخواهت؛ اطلاعات حساس ننویس." />{errors.note && <p className="field-error">{errors.note}</p>}</div>
-      <label className="consent"><input type="checkbox" checked={data.consent} onChange={event => change('consent', event.target.checked)} /><span>با استفاده از این اطلاعات برای هماهنگی وقتم موافقم. <Link href="/privacy">حریم خصوصی</Link></span></label>
-      {errors.consent && <p className="field-error" role="alert">{errors.consent}</p>}
+      <div className="field"><label htmlFor="note">چیزی هست که قبل از وقتت بدانم؟ <span>(اختیاری)</span></label><textarea id="note" name="note" rows={3} maxLength={500} value={data.note} aria-invalid={Boolean(errors.note)} aria-describedby={errors.note ? 'note-error' : undefined} onChange={event => change('note', event.target.value)} placeholder="مثلاً مدل یا رنگ دلخواهت؛ اطلاعات حساس ننویس." />{errors.note && <p className="field-error" id="note-error">{errors.note}</p>}</div>
+      <label className="consent"><input type="checkbox" checked={data.consent} aria-invalid={Boolean(errors.consent)} aria-describedby={errors.consent ? 'consent-error' : undefined} onChange={event => change('consent', event.target.checked)} /><span>با استفاده از این اطلاعات برای هماهنگی وقتم موافقم. <Link href="/privacy">حریم خصوصی</Link></span></label>
+      {errors.consent && <p className="field-error" id="consent-error">{errors.consent}</p>}
       {errors.form && <p className="form-error" role="alert">{errors.form}</p>}
       <button type="submit" disabled={pending} className="button primary full booking-cta">{pending ? 'در حال ثبت درخواست…' : useWhatsapp ? 'آماده‌کردن درخواست برای واتس‌اپ' : 'ثبت درخواست وقت'}<Icon name={useWhatsapp ? 'whatsapp' : 'arrow'} size={20} /></button>
       <p className="form-disclaimer">{useWhatsapp ? 'پیام در واتس‌اپ باز می‌شود و خودت آن را ارسال می‌کنی.' : 'پس از ثبت، برای نهایی‌کردن نوبت با تو هماهنگ می‌کنیم.'}</p>
