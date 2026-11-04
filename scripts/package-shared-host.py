@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from pathlib import Path
 import zipfile
 
@@ -19,6 +20,7 @@ with zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as archive:
         if name.startswith('public_html/'):
             assert name.startswith('public_html/tina-preview/')
         entry = zipfile.ZipInfo(name)
+        entry.date_time = datetime.now().timetuple()[:6]
         entry.create_system = 3
         entry.external_attr = 0o100644 << 16
         archive.writestr(entry, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED)

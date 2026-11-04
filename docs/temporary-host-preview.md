@@ -2,6 +2,16 @@
 
 ## Current release
 
+**Update, 2026-11-04:** the preview now uses real shared-host booking storage. The former static-only limitation below is superseded. The PHP adapter confirms available slots and returns the final receipt; SMS and WhatsApp remain disabled. See `shared-host-booking.md` for storage, release and migration details. Application source: `d94e8c7`.
+
+Host checks confirmed `booking_live: true`, API health `enabled: true` with `notifications: false`, and public date availability. Guest storage is outside `public_html`; no synthetic guest was registered on the live calendar. Local verification covered the complete form-to-receipt flow, HTTP contract, all 23 project tests including PostgreSQL integration, and a six-process PHP race with one winner. Read-only review found and verified the fix for non-field API error messages.
+
+Final public checks: current HTML source marker `d94e8c7` with no disabled-preview notice; all four slots became selectable for 16 Aban, with the selected manicure treatment/day/time preserved at the contact step. At 390px there was no horizontal overflow; browser warning/error logs were empty. The main POST endpoint rejected an empty request with HTTP 422 `VALIDATION`, exercising its origin/JSON path without creating a booking. Authenticated File Manager showed the private database at `tina-booking-runtime/data/appointments.sqlite` with mode 0600. The domain root still rendered `خانه — محمدرضا دلیلی`. Screenshot: `artifacts/tina-booking-live-mobile-20261104.png`.
+
+Publication backup: `tina-before-booking-20261104.zip` in private host storage. Main release: `tina-shared-host-booking-20261104-refresh.zip`, 82 files, no database or guest records. Only the main application package was deployed; the proposed auxiliary verification API was not uploaded.
+
+## Previous static-only release (superseded)
+
 Public preview: https://mrdalili.ir/tina-preview/
 
 Sample receipt: https://mrdalili.ir/tina-preview/receipt-preview/

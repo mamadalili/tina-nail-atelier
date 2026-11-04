@@ -20,6 +20,8 @@ Availability returns only a requested date and occupied period IDs. Responses ar
 4. Back up the existing preview in private host storage. Upload the archive into the host home and extract it there. Do not extract it beneath `public_html`; it already contains that prefix. Existing private guest storage must remain in place on every update.
 5. Verify HTTPS `/tina-preview/api/booking.php?action=health`, date availability, and the booking UI. The folder selects the host's existing `ea-php84` handler without changing PHP for the personal site at the domain root. PDO SQLite must be enabled. A missing runtime or database driver fails closed with HTTP 503.
 
+The packager writes current ZIP timestamps. A fixed 1980 timestamp left the server serving stale cached HTML even though the new file was verified in File Manager; use a refreshed archive when replacing files. Do not overwrite guest storage while updating static assets.
+
 The static HTML refreshes its calendar in the browser. Only past dates and started/taken periods are disabled. The server revalidates every final submission. Save the receipt before leaving the page; private receipt details are not persisted in browser storage.
 
 ## Verification commands
