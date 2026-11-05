@@ -17,8 +17,8 @@ export function CinematicHero() {
         </div>
       </div>
       <figure className="hero-figure">
-        <div className="portrait-frame"><Image className="hero-portrait" src="/images/tina-editorial-hands-v6.webp" alt="تصویر مفهومی آتلیه؛ دست با ناخن‌های زرشکی روی چهره‌ای در سایه، با نور سینمایی" width={1122} height={1402} loading="eager" fetchPriority="high" sizes="(max-width: 680px) 100vw, (max-width: 1100px) 60vw, 58vw" quality={85} /><span className="portrait-light" aria-hidden="true" /></div>
-        <figcaption><span className="hero-art-title" lang="en" dir="ltr">The art<br />of detail.</span><span className="hero-art-note">تصویر مفهومی آتلیه</span></figcaption>
+        <div className="portrait-frame"><Image className="hero-portrait" src="/images/tina-editorial-hands-v6.webp" alt="دست با ناخن‌های زرشکی روی چهره‌ای در سایه، با نور سینمایی" width={1122} height={1402} loading="eager" fetchPriority="high" sizes="(max-width: 680px) 100vw, (max-width: 1100px) 60vw, 58vw" quality={85} /><span className="portrait-light" aria-hidden="true" /></div>
+        <figcaption><span className="hero-art-title" lang="en" dir="ltr">The art<br />of detail.</span></figcaption>
       </figure>
     </div>
     <div className="hero-rail wrap"><span lang="en" dir="ltr">TINA — NAIL ATELIER</span><span>مانیکور <i aria-hidden="true">/</i> پدیکور</span><a href="#booking">وقتی برای خودت <span aria-hidden="true">↓</span></a></div>
