@@ -1,0 +1,32 @@
+<?php
+declare(strict_types=1);
+require __DIR__.'/../deploy/shared-host/runtime/BookingStore.php';
+function migrationOk(bool $value,string $message):void{if(!$value)throw new RuntimeException($message);}
+$dir=sys_get_temp_dir().'/tina-staff-migration-'.bin2hex(random_bytes(6));mkdir($dir,0700);$path=$dir.'/appointments.sqlite';
+$old=new PDO('sqlite:'.$path);
+$old->exec("CREATE TABLE appointments(reference TEXT PRIMARY KEY,request_key TEXT NOT NULL UNIQUE,payload_hash TEXT NOT NULL,jalali_day TEXT NOT NULL,period TEXT NOT NULL,receipt TEXT NOT NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'CONFIRMED',version INTEGER NOT NULL DEFAULT 1,updated_at TEXT);
+CREATE UNIQUE INDEX confirmed_slot ON appointments(jalali_day,period) WHERE status='CONFIRMED';
+CREATE TABLE slot_blocks(jalali_day TEXT NOT NULL,period TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(jalali_day,period));
+CREATE TABLE booking_history(id INTEGER PRIMARY KEY,reference TEXT,action TEXT NOT NULL,details TEXT NOT NULL,created_at TEXT NOT NULL);
+INSERT INTO slot_blocks VALUES('1405-08-20','14-16','2026-11-04T08:00:00Z')");
+$data=['name'=>'مهمان قبلی','phone'=>'09000000000','service'=>'pedicure','manicureType'=>'','date'=>'1405-08-20','period'=>'12-14','note'=>'','consent'=>true];
+$payload=json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);$hash=hash('sha256',$payload);
+$key='70e39a2d-2f0e-4e1f-a4c1-59dc5f6ff205';$reference='TN-AAAAAAAAAAAAAAAA';
+$receipt=['reference'=>$reference,'status'=>'CONFIRMED','name'=>$data['name'],'service'=>'خدمات پدیکور','treatment'=>'','date'=>$data['date'],'period'=>$data['period'],'startsAt'=>'2026-11-11T08:30:00.000Z','endsAt'=>'2026-11-11T10:30:00.000Z','issuedAt'=>'2026-11-04T08:00:00.000Z'];
+$insert=$old->prepare('INSERT INTO appointments(reference,request_key,payload_hash,jalali_day,period,receipt,payload,created_at) VALUES(?,?,?,?,?,?,?,?)');
+$insert->execute([$reference,$key,$hash,$data['date'],$data['period'],json_encode($receipt,JSON_UNESCAPED_UNICODE),$payload,$receipt['issuedAt']]);
+unset($insert,$old);
+$store=new BookingStore($path);$now=new DateTimeImmutable('2026-11-04T08:00:00Z');
+migrationOk(count(glob($path.'.before-staff-*.sqlite'))===1,'Migration backs up the previous calendar');
+migrationOk($store->adminMonth('1405-08','tina')['appointments'][0]['staff']==='tina','Existing appointment belongs to Tina');
+migrationOk($store->availability($data['date'],$now,'tina')['taken']===['12-14','14-16'],'Existing closure belongs to Tina');
+migrationOk($store->availability($data['date'],$now,'sonia')['taken']===[],'Sonia starts open');
+$replay=$store->reserve($key,$data,'local',$now);
+migrationOk($replay['repeated']&&$replay['receipt']['staffName']==='تینا','Legacy request can retrieve its current receipt');
+$store->adminUpdate($reference,1,$data+['staff'=>'sonia'],$now);
+$replay=$store->reserve($key,$data,'local',$now);
+migrationOk($replay['receipt']['staff']==='sonia'&&$replay['receipt']['staffName']==='سونیا','Legacy replay follows an intentional reassignment');
+$db=new PDO('sqlite:'.$path);
+migrationOk($db->query('SELECT payload_hash FROM appointments')->fetchColumn()===$hash,'Original idempotency hash is preserved');
+unset($store,$db);foreach(glob($dir.'/*')as$file)unlink($file);rmdir($dir);
+echo "PASS staff migration: preserved booking/hash, Tina closures, open Sonia, legacy retry and reassignment\n";
