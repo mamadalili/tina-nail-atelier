@@ -9,6 +9,8 @@ final class BookingStore {
     private PDO $db;
     private const PERIODS = ['10-12'=>10,'12-14'=>12,'14-16'=>14,'16-18'=>16];
     private const STAFF = ['tina'=>'تینا','sonia'=>'سونیا'];
+    private const SERVICES = ['manicure'=>'خدمات دست','pedicure'=>'خدمات پا'];
+    private const TREATMENTS = [''=>'','gel'=>'ژلیش','extensions'=>'کاشت'];
 
     public function __construct(string $path) {
         $this->db = new PDO('sqlite:'.$path, null, null, [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
@@ -97,18 +99,22 @@ final class BookingStore {
             if (!is_string($input[$key]) || !preg_match('//u',$input[$key])) self::invalid($key,'اطلاعات این قسمت معتبر نیست.');
         }
         $name=trim($input['name']); $note=trim($input['note']);
+        if ($name==='') self::invalid('name','نام و نام خانوادگی‌ات را وارد کن.');
         if(self::textLength($name)<2 || self::textLength($name)>80 || preg_match('/[\x00-\x1F\x7F]/u',$name)) self::invalid('name','نام و نام خانوادگی معتبر بنویس.');
+        if (trim($input['phone'])==='') self::invalid('phone','شمارهٔ موبایلت را وارد کن.');
         $phone=strtr($input['phone'],array_combine(preg_split('//u','۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩',-1,PREG_SPLIT_NO_EMPTY),str_split('01234567890123456789')));
         $phone=preg_replace('/[\s()-]/u','',$phone);
         $phone=preg_replace('/^(?:\+98|0098)/','0',$phone);
         if (!preg_match('/^09\d{9}$/D',$phone)) self::invalid('phone','شمارهٔ موبایل معتبر وارد کن.');
-        if (!in_array($input['service'],['manicure','pedicure'],true)) self::invalid('service','یک خدمت انتخاب کن.');
-        if ($input['service']==='manicure' && !in_array($input['manicureType'],['gel','extensions'],true)) self::invalid('manicureType','ژلیش یا کاشت را انتخاب کن.');
-        if (!isset(self::PERIODS[$input['period']])) self::invalid('period','یک بازهٔ دوساعته انتخاب کن.');
+        if (!isset(self::SERVICES[$input['service']])) self::invalid('service','یک خدمت انتخاب کن.');
+        $type=$input['service']==='manicure'?$input['manicureType']:'';
+        if (!isset(self::TREATMENTS[$type])) self::invalid('manicureType','نوع خدمت معتبر نیست.');
+        if (trim($input['date'])==='') self::invalid('date','روز مراجعه را از تقویم انتخاب کن.');
+        if (!isset(self::PERIODS[$input['period']])) self::invalid('period','ساعت مراجعه را از بین بازه‌های دوساعته انتخاب کن.');
         if (self::textLength($note)>500) self::invalid('note','توضیحات را کوتاه‌تر از ۵۰۰ حرف بنویس.');
         if (($input['consent']??false)!==true) self::invalid('consent','رضایت تماس را تأیید کن.');
         self::gregorian($input['date']);
-        return ['name'=>$name,'phone'=>$phone,'service'=>$input['service'],'manicureType'=>$input['service']==='manicure'?$input['manicureType']:'','date'=>$input['date'],'period'=>$input['period'],'note'=>$note,'consent'=>true,'staff'=>self::staff($input['staff']??'tina')];
+        return ['name'=>$name,'phone'=>$phone,'service'=>$input['service'],'manicureType'=>$type,'date'=>$input['date'],'period'=>$input['period'],'note'=>$note,'consent'=>true,'staff'=>self::staff($input['staff']??'tina')];
     }
 
     private static function allowedDate(string $day,DateTimeImmutable $now): string {
@@ -153,7 +159,7 @@ final class BookingStore {
             $query=$this->db->prepare('INSERT INTO rate_limits(client,bucket,count) VALUES (?,?,1) ON CONFLICT(client,bucket) DO UPDATE SET count=count+1'); $query->execute([$clientHash,$bucket]);
             $query=$this->db->prepare('DELETE FROM rate_limits WHERE bucket<?');$query->execute([$bucket-24]);
             $utc=new DateTimeZone('UTC');$iso=fn(DateTimeImmutable $date)=>$date->setTimezone($utc)->format('Y-m-d\TH:i:s.000\Z');
-            $receipt=['reference'=>'TN-'.strtoupper(bin2hex(random_bytes(12))),'status'=>'CONFIRMED','name'=>$data['name'],'service'=>$data['service']==='manicure'?'خدمات مانیکور':'خدمات پدیکور','treatment'=>$data['service']==='manicure'?($data['manicureType']==='gel'?'ژلیش':'کاشت'):'','date'=>$data['date'],'period'=>$data['period'],'startsAt'=>$iso($start),'endsAt'=>$iso($start->modify('+2 hours')),'issuedAt'=>$iso($now)];
+            $receipt=['reference'=>'TN-'.strtoupper(bin2hex(random_bytes(12))),'status'=>'CONFIRMED','name'=>$data['name'],'service'=>self::SERVICES[$data['service']],'treatment'=>self::TREATMENTS[$data['manicureType']],'date'=>$data['date'],'period'=>$data['period'],'startsAt'=>$iso($start),'endsAt'=>$iso($start->modify('+2 hours')),'issuedAt'=>$iso($now)];
             $receipt['staff']=$data['staff'];$receipt['staffName']=self::STAFF[$data['staff']];
             $query=$this->db->prepare('INSERT INTO appointments(reference,request_key,payload_hash,jalali_day,period,receipt,payload,created_at,staff) VALUES (?,?,?,?,?,?,?,?,?)');
             $query->execute([$receipt['reference'],$key,$hash,$data['date'],$data['period'],json_encode($receipt,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$payload,$receipt['issuedAt'],$data['staff']]);
@@ -170,7 +176,7 @@ final class BookingStore {
 
     private static function adminRecord(array $row):array {
         $data=json_decode($row['payload'],true,512,JSON_THROW_ON_ERROR);
-        return ['reference'=>$row['reference'],'status'=>$row['status'],'version'=>(int)$row['version'],'name'=>$data['name'],'phone'=>$data['phone'],'service'=>$data['service'],'manicureType'=>$data['manicureType'],'date'=>$row['jalali_day'],'period'=>$row['period'],'note'=>$data['note'],'issuedAt'=>$row['created_at'],'updatedAt'=>$row['updated_at'],'staff'=>$row['staff']];
+        return ['reference'=>$row['reference'],'status'=>$row['status'],'version'=>(int)$row['version'],'name'=>$data['name'],'phone'=>$data['phone'],'service'=>$data['service'],'manicureType'=>$data['manicureType']??'','date'=>$row['jalali_day'],'period'=>$row['period'],'note'=>$data['note'],'issuedAt'=>$row['created_at'],'updatedAt'=>$row['updated_at'],'staff'=>$row['staff']];
     }
 
     public function adminMonth(string $month,string $staff='tina'):array {
@@ -207,8 +213,15 @@ final class BookingStore {
             if($moved&&$start<$now)self::invalid('period','این ساعت گذشته است؛ ساعت آینده را انتخاب کن.');
             $this->assertSlotFree($data['date'],$data['period'],$data['staff'],$reference);
             $receipt=json_decode($old['receipt'],true,512,JSON_THROW_ON_ERROR);
+            $previous=json_decode($old['payload'],true,512,JSON_THROW_ON_ERROR);
+            $sameService=$previous['service']===$data['service'];
+            $previousType=$previous['manicureType']??'';
+            if($sameService && $data['service']==='manicure' && !array_key_exists('manicureType',$input)) $data['manicureType']=$previousType;
+            // A reschedule keeps the wording on an already issued receipt.
+            if(!$sameService || !isset($receipt['service'])) $receipt['service']=self::SERVICES[$data['service']];
+            if(!$sameService || $previousType!==$data['manicureType'] || !isset($receipt['treatment'])) $receipt['treatment']=self::TREATMENTS[$data['manicureType']];
             $iso=fn(DateTimeImmutable $time)=>$time->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.000\Z');
-            $receipt=array_replace($receipt,['name'=>$data['name'],'date'=>$data['date'],'period'=>$data['period'],'service'=>$data['service']==='manicure'?'خدمات مانیکور':'خدمات پدیکور','treatment'=>$data['service']==='manicure'?($data['manicureType']==='gel'?'ژلیش':'کاشت'):'','startsAt'=>$iso($start),'endsAt'=>$iso($start->modify('+2 hours'))]);
+            $receipt=array_replace($receipt,['name'=>$data['name'],'date'=>$data['date'],'period'=>$data['period'],'startsAt'=>$iso($start),'endsAt'=>$iso($start->modify('+2 hours'))]);
             $receipt['staff']=$data['staff'];$receipt['staffName']=self::STAFF[$data['staff']];
             $q=$this->db->prepare('UPDATE appointments SET jalali_day=?,period=?,staff=?,payload=?,receipt=?,version=version+1,updated_at=? WHERE reference=?');
             $q->execute([$data['date'],$data['period'],$data['staff'],json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),json_encode($receipt,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$now->format(DATE_ATOM),$reference]);

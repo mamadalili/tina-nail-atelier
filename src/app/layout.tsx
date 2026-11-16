@@ -5,8 +5,8 @@ import '@fontsource/cormorant-garamond/500-italic.css';
 import './atelier.css';
 
 export const metadata: Metadata = {
-  title: 'تینا حسین‌زاده | ناخن، مانیکور و پدیکور',
-  description: 'خدمات ناخن، مانیکور و پدیکور با تینا حسین‌زاده در ستارخان، حبیب‌الله شمالی. انتخاب روز و ساعت دلخواه و هماهنگی وقت با تماس یا واتس‌اپ.',
+  title: 'آتلیهٔ ناخن تینا حسین‌زاده | خدمات دست و پا',
+  description: 'خدمات دست و پا در آتلیهٔ ناخن تینا حسین‌زاده در ستارخان، حبیب‌الله شمالی. روز و ساعت دلخواهت را از تقویم تینا یا سونیا انتخاب کن.',
   robots: process.env.SITE_URL ? { index: true, follow: true } : { index: false, follow: false },
 };
 

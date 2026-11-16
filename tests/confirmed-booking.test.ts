@@ -10,12 +10,13 @@ test('a Jalali appointment becomes exactly two hours in Tehran time', () => {
   assert.throws(() => slotTimes('1405-08-14', 'night'));
 });
 
-const record = { reference: 'TN-1234567890ABCDEF', status: 'CONFIRMED', name: 'مهمان آزمایشی', service: 'manicure', manicureType: 'gel', jalaliDay: '1405-08-14', period: '12-14', createdAt: new Date('2026-11-04T08:00:00Z') };
+const record = { reference: 'TN-1234567890ABCDEF', status: 'CONFIRMED', name: 'مهمان آزمایشی', service: 'manicure', receiptServiceName: null, manicureType: 'gel', jalaliDay: '1405-08-14', period: '12-14', createdAt: new Date('2026-11-04T08:00:00Z') };
 
 test('only a confirmed database record produces a final receipt', () => {
   const receipt = receiptFor(record);
   assert.equal(receipt.status, 'CONFIRMED');
   assert.equal(receipt.date, '1405-08-14');
+  assert.equal(receipt.service, 'خدمات مانیکور');
   assert.equal(receipt.treatment, 'ژلیش');
   assert.equal(receiptSchema.safeParse(receipt).success, true);
   assert.throws(() => receiptFor({ ...record, status: 'PENDING' }));
@@ -34,7 +35,7 @@ test('guest SMS and manager SMS use separate recipients and approved patterns', 
     return new Response(JSON.stringify({ meta: { status: true }, data: { message_outbox_ids: [42] } }), { status: 200 });
   };
   const env = { IPPANEL_API_KEY: 'test-not-a-real-key', IPPANEL_FROM_NUMBER: '+9830000', SMS_USER_PATTERN: 'guest', SMS_ADMIN_PATTERN: 'manager', ADMIN_PHONE: '09353155852' };
-  const event = { channel: 'SMS_USER', request: { ...record, phone: '09120000000', note: '' } };
+  const event = { channel: 'SMS_USER', request: { ...record, receiptServiceName: 'خدمات دست', manicureType: null, phone: '09120000000', note: '' } };
   assert.equal(await sendNotification(event, env, transport), '42');
   await sendNotification({ ...event, channel: 'SMS_ADMIN' }, env, transport);
   assert.equal(calls[0].url, 'https://edge.ippanel.com/v1/api/send');
@@ -43,6 +44,7 @@ test('guest SMS and manager SMS use separate recipients and approved patterns', 
   assert.equal(calls[0].body.code, 'guest');
   assert.equal(calls[1].body.code, 'manager');
   assert.equal(calls[0].body.params.reference, record.reference);
+  assert.equal(calls[0].body.params.service, 'خدمات دست');
   assert.equal(calls[0].body.phonebook, undefined);
 });
 
@@ -62,4 +64,16 @@ test('WhatsApp manager notification is a backend template without a customer han
   assert.equal(sent.to, '989353155852');
   assert.equal(sent.type, 'template');
   assert.equal(sent.template.name, 'appointment');
+  assert.equal(sent.template.components[0].parameters[1].text, 'خدمات مانیکور / ژلیش');
+});
+
+test('a queued Telegram request retains its original service label and treatment', async () => {
+  let message = '';
+  await sendNotification({ channel: 'TELEGRAM', request: { ...record, status: 'PENDING', phone: '09120000000', note: '' } },
+    { TELEGRAM_BOT_TOKEN: 'test', TELEGRAM_CHAT_ID: 'test' }, async (_url, init) => {
+      message = JSON.parse(String(init?.body)).text;
+      return Response.json({ ok: true, result: { message_id: 42 } });
+    });
+  assert.match(message, /خدمت: خدمات مانیکور\n/);
+  assert.match(message, /ژلیش/);
 });

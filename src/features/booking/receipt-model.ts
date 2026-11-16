@@ -29,15 +29,21 @@ export function slotTimes(day: string, periodId: string) {
   return { startsAt, endsAt: new Date(startsAt.getTime() + 2 * 3600000) };
 }
 
-export type ReceiptRecord = { reference: string; status: string; name: string; service: string; manicureType: string | null; jalaliDay: string; period: string; createdAt: Date; staff?: string };
+export type ReceiptRecord = { reference: string; status: string; name: string; service: string; receiptServiceName: string | null; manicureType: string | null; jalaliDay: string; period: string; createdAt: Date; staff?: string };
+
+const originalServiceNames = { manicure: 'خدمات مانیکور', pedicure: 'خدمات پدیکور' };
+
+export function bookedServiceName(record: Pick<ReceiptRecord, 'service' | 'receiptServiceName'>) {
+  const service = services.find(item => item.id === record.service);
+  if (!service) throw new Error('INVALID_SERVICE');
+  return record.receiptServiceName ?? originalServiceNames[service.id];
+}
 
 export function receiptFor(record: ReceiptRecord): BookingReceiptData {
   if (record.status !== 'CONFIRMED') throw new Error('BOOKING_NOT_CONFIRMED');
-  const service = services.find(item => item.id === record.service);
-  if (!service) throw new Error('INVALID_SERVICE');
   const slot = slotTimes(record.jalaliDay, record.period);
   return receiptSchema.parse({
-    reference: record.reference, status: record.status, name: record.name, service: service.name,
+    reference: record.reference, status: record.status, name: record.name, service: bookedServiceName(record),
     treatment: record.service === 'manicure' ? manicureOptions.find(item => item.id === record.manicureType)?.label ?? '' : '',
     date: record.jalaliDay, period: record.period, startsAt: slot.startsAt.toISOString(), endsAt: slot.endsAt.toISOString(), issuedAt: record.createdAt.toISOString(), staff: record.staff ?? 'tina',
   });

@@ -4,7 +4,7 @@ Public booking: `/tina-preview/`. Private calendar UI: `/tina-administrator/`. T
 
 ## Everyday use
 
-Sign in with the manager password, select a Persian month and day, and use the four two-hour rows. Occupied rows show guest details and edit/cancel controls. Free rows can be closed; closed rows can be reopened. Cancellation asks for confirmation, retains the original record and releases its time. Editing can change guest details, service/treatment, note, date or time; conflicts never silently overwrite another appointment. The guest phone link opens a call. No SMS or messenger notice is sent.
+Sign in with the manager password, select a Persian month and day, and use the four two-hour rows. Occupied rows show guest details and edit/cancel controls. Free rows can be closed; closed rows can be reopened. Cancellation asks for confirmation, retains the original record and releases its time. Editing can change guest details, service, note, date or time; conflicts never silently overwrite another appointment. The guest phone link opens a call. No SMS or messenger notice is sent.
 
 The calendar can inspect previous months. New/moved appointments and closures use the same Tehran time and 90-day window as public booking. Past guest details can be corrected without moving the appointment. On narrow screens the calendar and daily list stack; below 360px a native day selector replaces the grid. Use Logout on a shared device.
 

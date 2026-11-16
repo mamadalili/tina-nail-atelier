@@ -36,7 +36,7 @@ export default function Home() {
       </section>
 
       <section id="services" className="services-section wrap section" aria-labelledby="services-title">
-        <Reveal><div className="section-heading"><div><span className="section-kicker" lang="en" dir="ltr">The atelier menu</span><h2 id="services-title">جزئیات کوچک.<br /><span className="subtle">انتخاب‌های شخصی.</span></h2></div><p>از یک مانیکور ساده تا انتخاب رنگ و طراحی ناخن؛<br />خدمتی که می‌خواهی را انتخاب کن.</p></div><ServiceIndex /></Reveal>
+        <Reveal><div className="section-heading"><div><span className="section-kicker" lang="en" dir="ltr">The atelier menu</span><h2 id="services-title">جزئیات کوچک.<br /><span className="subtle">انتخاب‌های شخصی.</span></h2></div><p>برای رسیدگی به ناخن‌های دست یا پا،<br />خدمت دلخواهت را انتخاب کن.</p></div><ServiceIndex /></Reveal>
         <p className="service-footnote">برای پرسیدن تعرفه یا جزئیات طراحی، پیش از رزرو با تینا تماس بگیر.</p>
       </section>
 
@@ -52,7 +52,7 @@ export default function Home() {
     </main>
     <footer className="site-footer wrap">
       <a className="footer-wordmark" href="/" lang="en" dir="ltr">Tina.</a>
-      <div className="footer-identity"><strong>تینا · خدمات ناخن</strong><ul aria-label="خدمات تینا"><li>آرایشی</li><li>بهداشتی</li><li>پدیکور</li><li>مانیکور</li></ul></div>
+      <div className="footer-identity"><strong>تینا · خدمات ناخن</strong><ul aria-label="خدمات تینا"><li>آرایشی</li><li>بهداشتی</li><li>خدمات پا</li><li>خدمات دست</li></ul></div>
       <Link href="/privacy">حریم خصوصی</Link><a href="#main">بالای صفحه ↑</a>
     </footer>
     <MobileBookingLink />

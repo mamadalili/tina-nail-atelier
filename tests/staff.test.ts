@@ -16,6 +16,6 @@ test('availability URLs preserve the selected person', () => {
   assert.match(bookingEndpoints('shared-host', '/tina-preview').availability(body.date, 'sonia'), /staff=sonia/);
 });
 test('receipt includes the Persian name of the selected person', () => {
-  const receipt = receiptFor({ reference: 'TN-AAAAAAAAAAAAAAAA', status: 'CONFIRMED', name: body.name, service: body.service, manicureType: '', staff: 'sonia', jalaliDay: body.date, period: body.period, createdAt: new Date('2026-11-04T08:00:00Z') });
+  const receipt = receiptFor({ reference: 'TN-AAAAAAAAAAAAAAAA', status: 'CONFIRMED', name: body.name, service: body.service, receiptServiceName: 'خدمات پا', manicureType: '', staff: 'sonia', jalaliDay: body.date, period: body.period, createdAt: new Date('2026-11-04T08:00:00Z') });
   assert.equal(receipt.staffName, 'سونیا');
 });

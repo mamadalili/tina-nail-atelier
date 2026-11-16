@@ -42,6 +42,14 @@ ok($store->availability('1405-08-16',$now)['taken']===[],'Reopen frees slot');
 $another=$store->reserve('70e39a2d-2f0e-4e1f-a4c1-59dc5f6ff1dd',$data,'local',$now);
 ok($another['receipt']['status']==='CONFIRMED','Released slot can be reserved again');
 rejected(fn()=>$store->adminUpdate($another['receipt']['reference'],1,array_replace($data,['date'=>'1405-08-12']),$now),'VALIDATION');
+$edit=$data;unset($edit['manicureType']);
+foreach ([['pedicure','خدمات پا'],['manicure','خدمات دست']] as $i=>[$service,$label]) {
+    $edit['service']=$service;
+    $updated=$store->adminUpdate($another['receipt']['reference'],$i+1,$edit,$now);
+    ok($updated['service']===$service && $updated['manicureType']==='', 'Changing service in the calendar never carries over a treatment');
+    $current=$store->reserve('70e39a2d-2f0e-4e1f-a4c1-59dc5f6ff1dd',$data,'local',$now)['receipt'];
+    ok($current['service']===$label && $current['treatment']==='', 'The original request retrieves the new service alone after an edit');
+}
 rejected(fn()=>$store->adminMonth('1405-99'),'VALIDATION');
 $db=new PDO('sqlite:'.$path);
 ok((int)$db->query('SELECT count(*) FROM booking_history')->fetchColumn()>=4,'Changes are audited');

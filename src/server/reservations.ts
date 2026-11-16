@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { services } from '../content/salon';
 import type { PrismaClient } from '../generated/prisma/client';
 import { selectionErrors, validateRequest, validateSubmission } from '../features/booking/model';
 import { receiptFor, slotTimes } from '../features/booking/receipt-model';
@@ -36,6 +37,7 @@ export async function reserveAppointment(db: PrismaClient, key: string, input: u
       const created = await tx.appointmentRequest.create({ data: {
         reference: `TN-${randomBytes(8).toString('hex').toUpperCase()}`, idempotencyKey: key, payloadHash,
         name: data.name, phone: data.phone, service: data.service, manicureType: data.manicureType || null,
+        receiptServiceName: services.find(service => service.id === data.service)!.name,
         staff: data.staff ?? 'tina',
         preferredDay: new Date(`${toGregorianDay(data.date)}T00:00:00Z`), jalaliDay: data.date, period: data.period,
         note: data.note, status: 'CONFIRMED', ...times,

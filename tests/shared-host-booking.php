@@ -8,12 +8,16 @@ require $runtime;
 function expect(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);
 }
-function fails(callable $run, string $code): void {
-    try { $run(); } catch (BookingFailure $error) { expect($error->errorCode === $code, "Expected $code, got {$error->errorCode}"); return; }
+function fails(callable $run, string $code, array $fields = []): void {
+    try { $run(); } catch (BookingFailure $error) {
+        expect($error->errorCode === $code, "Expected $code, got {$error->errorCode}");
+        if ($fields) expect($error->errors === $fields, 'Expected field guidance: '.implode(', ', $fields));
+        return;
+    }
     throw new RuntimeException("Expected $code");
 }
 function requestData(array $changes = []): array {
-    return array_replace(['name'=>'مهمان آزمایشی','phone'=>'۰۹۱۲۳۴۵۶۷۸۹','service'=>'manicure','manicureType'=>'gel','date'=>'1405-08-14','period'=>'12-14','note'=>'','consent'=>true], $changes);
+    return array_replace(['name'=>'مهمان آزمایشی','phone'=>'۰۹۱۲۳۴۵۶۷۸۹','service'=>'manicure','date'=>'1405-08-14','period'=>'12-14','note'=>'','consent'=>true], $changes);
 }
 $now = new DateTimeImmutable('2026-11-04T08:00:00Z');
 $dir = sys_get_temp_dir() . '/tina-booking-test-' . bin2hex(random_bytes(6));
@@ -23,17 +27,33 @@ $store = new BookingStore($dbPath);
 $key = '70e39a2d-2f0e-4e1f-a4c1-59dc5f6ff1db';
 $first = $store->reserve($key, requestData(), 'guest-a', $now);
 expect($first['receipt']['status'] === 'CONFIRMED', 'Must confirm');
+expect($first['receipt']['service'] === 'خدمات دست' && $first['receipt']['treatment'] === '', 'A hand booking without a subtype issues only the hand service');
 expect($first['receipt']['startsAt'] === '2026-11-05T08:30:00.000Z', 'Must use Tehran time');
 expect(preg_match('/^TN-[A-F0-9]{24}$/', $first['receipt']['reference']) === 1, 'Random reference');
 expect($first['receipt']['name'] === 'مهمان آزمایشی', 'Receipt guest');
-$again = (new BookingStore($dbPath))->reserve($key, requestData(), 'guest-a', $now->modify('+2 days'));
+$again = (new BookingStore($dbPath))->reserve($key, requestData(['manicureType'=>'']), 'guest-a', $now->modify('+2 days'));
 expect($again['repeated'] && $again['receipt'] === $first['receipt'], 'Retry must survive restarts and past slot');
 fails(fn()=>$store->reserve($key, requestData(['name'=>'مهمان دیگر']), 'guest-a', $now), 'IDEMPOTENCY_CONFLICT');
 fails(fn()=>$store->reserve('70e39a2d-2f0e-4e1f-a4c1-59dc5f6ff1dc', requestData(['service'=>'pedicure','manicureType'=>'']), 'guest-b', $now), 'SLOT_TAKEN');
 $availability = $store->availability('1405-08-14', $now);
 expect($availability === ['date'=>'1405-08-14','taken'=>['12-14']], 'Availability must contain only slot IDs');
-foreach ([['date'=>'1405-08-12'], ['date'=>'1405-12-30'], ['date'=>'1406-03-01'], ['consent'=>false], ['phone'=>'123'], ['manicureType'=>''], ['service'=>'other'], ['period'=>'11-13'], ['name'=>['nested']], ['note'=>str_repeat('x',501)]] as $bad) {
+foreach ([
+    [['service'=>'pedicure'], '10-12', 'خدمات پا', ''],
+    [['manicureType'=>'gel'], '14-16', 'خدمات دست', 'ژلیش'],
+    [['manicureType'=>'extensions'], '16-18', 'خدمات دست', 'کاشت'],
+] as $i=>[$service,$period,$label,$treatment]) {
+    $issued=$store->reserve(sprintf('70e39a2d-2f0e-4e1f-a4c1-%012d',100+$i),requestData($service+['period'=>$period]),'guest-b',$now)['receipt'];
+    expect($issued['service']===$label && $issued['treatment']===$treatment,'The receipt reflects only the service and treatment actually requested');
+}
+$oldFootPayload = requestData(['service'=>'pedicure','period'=>'10-12','manicureType'=>'unused']);
+expect($store->reserve('70e39a2d-2f0e-4e1f-a4c1-000000000100', $oldFootPayload, 'guest-b', $now)['repeated'], 'Foot bookings ignore the old hand-only field on replay');
+foreach ([['date'=>'1405-08-12'], ['date'=>'1405-12-30'], ['date'=>'1406-03-01'], ['consent'=>false], ['phone'=>'123'], ['manicureType'=>'unknown'], ['manicureType'=>['gel']], ['service'=>'other'], ['period'=>'11-13'], ['name'=>['nested']], ['note'=>str_repeat('x',501)]] as $bad) {
     fails(fn()=>$store->reserve('70e39a2d-2f0e-4e1f-a4c1-59dc5f6ff1dd', requestData($bad), 'guest-c', $now), 'VALIDATION');
+}
+foreach (['name'=>'نام و نام خانوادگی‌ات را وارد کن.', 'phone'=>'شمارهٔ موبایلت را وارد کن.', 'date'=>'روز مراجعه را از تقویم انتخاب کن.', 'period'=>'ساعت مراجعه را از بین بازه‌های دوساعته انتخاب کن.'] as $field=>$prompt) {
+    $missing=requestData();unset($missing[$field]);
+    fails(fn()=>$store->reserve($key,$missing,'guest-c',$now), 'VALIDATION', [$field=>$prompt]);
+    fails(fn()=>$store->reserve($key,requestData([$field=>'']),'guest-c',$now), 'VALIDATION', [$field=>$prompt]);
 }
 fails(fn()=>$store->reserve('70e39a2d-2f0e-4e1f-a4c1-59dc5f6ff1de', requestData(['date'=>'1405-08-13','period'=>'10-12']), 'guest-c', $now), 'VALIDATION');
 expect(BookingStore::gregorian('1403-12-30') === '2025-03-20', 'Leap Esfand');

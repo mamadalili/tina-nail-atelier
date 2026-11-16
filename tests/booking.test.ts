@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { monthCells, shiftMonth, todayInTehran, toGregorianDay, isAllowedDay } from '../src/lib/jalali';
-import { normalizeDigits, validateRequest, validateSubmission, whatsappRequestUrl } from '../src/features/booking/model';
+import { normalizeDigits, selectionErrors, validateRequest, validateSubmission, whatsappRequestUrl, type BookingRequest } from '../src/features/booking/model';
 
 test('Tehran today changes at Iran midnight instead of UTC midnight', () => {
   assert.equal(todayInTehran(new Date('2026-11-02T20:29:59Z')), '1405-08-11');
@@ -37,11 +37,25 @@ test('requests require consent, a real service, valid phone and preferred day', 
   if (!result.success) for (const field of ['name', 'phone', 'service', 'date', 'period', 'consent']) assert.ok(result.errors[field]);
 });
 
+test('missing and blank booking fields each receive a Persian instruction naming the field', () => {
+  const now = new Date('2026-11-03T06:00:00Z');
+  for (const fields of [{}, { name: ' ', phone: '', date: '', period: '', consent: false }]) {
+    const result = validateSubmission({ service: 'manicure', ...fields }, now);
+    assert.ok(!result.success);
+    assert.match(result.errors.name, /نام/);
+    assert.match(result.errors.phone, /موبایل/);
+    assert.match(result.errors.date, /روز|تاریخ/);
+    assert.match(result.errors.period, /بازه|ساعت/);
+    assert.match(result.errors.consent, /رضایت|موافق/);
+    assert.equal(result.errors.manicureType, undefined);
+  }
+});
+
 test('WhatsApp prepares a request, not a confirmed booking, for the real owner number', () => {
-  const url = new URL(whatsappRequestUrl({ name: 'آزمایش', phone: '09353155852', service: 'pedicure', manicureType: '', date: '1405-08-13', period: '16-18', note: '', consent: true }));
+  const url = new URL(whatsappRequestUrl({ name: 'آزمایش', phone: '09353155852', service: 'pedicure', date: '1405-08-13', period: '16-18', note: '', consent: true }));
   assert.equal(url.pathname, '/989353155852');
   assert.match(url.searchParams.get('text')!, /درخواست وقت/);
-  assert.match(url.searchParams.get('text')!, /پدیکور/);
+  assert.match(url.searchParams.get('text')!, /خدمات پا/);
   assert.doesNotMatch(url.searchParams.get('text')!, /رزرو قطعی/);
 });
 
@@ -55,16 +69,33 @@ test('submission revalidates a once-valid preferred day after Tehran midnight', 
   if (!nextDay.success) assert.ok(nextDay.errors.date);
 });
 
-const manicureRequest = { name: 'آزمایش', phone: '09353155852', service: 'manicure', manicureType: 'gel', date: '1405-08-12', period: '10-12', note: '', consent: true };
+const manicureRequest = { name: 'آزمایش', phone: '09353155852', service: 'manicure', date: '1405-08-12', period: '10-12', note: '', consent: true } satisfies BookingRequest;
 
-test('manicure requires gel or extensions; pedicure removes an irrelevant manicure choice', () => {
-  for (const manicureType of ['', 'other']) {
-    const result = validateRequest({ ...manicureRequest, manicureType }, '1405-08-12');
-    assert.equal(result.success, false);
-    if (!result.success) assert.ok(result.errors.manicureType);
+test('a hand or foot booking can proceed without choosing a treatment', () => {
+  const now = new Date('2026-11-03T06:00:00Z');
+  for (const service of ['manicure', 'pedicure'] as const) {
+    const request = { ...manicureRequest, service };
+    assert.deepEqual(selectionErrors(request, now), {});
+    for (const input of [request, { ...request, manicureType: '' }]) {
+      const result = validateSubmission(input, now);
+      assert.ok(result.success);
+      assert.equal(result.data.manicureType, '');
+    }
   }
-  for (const manicureType of ['gel', 'extensions']) assert.equal(validateRequest({ ...manicureRequest, manicureType }, '1405-08-12').success, true);
-  const pedicure = validateRequest({ ...manicureRequest, service: 'pedicure' }, '1405-08-12');
+  const message = new URL(whatsappRequestUrl(manicureRequest)).searchParams.get('text')!;
+  assert.match(message, /خدمت: خدمات دست\n/);
+  assert.doesNotMatch(message, /ژلیش|کاشت|نوع مانیکور|undefined/);
+});
+
+test('historical hand treatments remain available on their original service', () => {
+  for (const manicureType of ['gel', 'extensions']) {
+    const result = validateRequest({ ...manicureRequest, manicureType }, '1405-08-12');
+    assert.ok(result.success);
+    assert.equal(result.data.manicureType, manicureType);
+  }
+  const invalid = validateRequest({ ...manicureRequest, manicureType: 'other' }, '1405-08-12');
+  assert.ok(!invalid.success && invalid.errors.manicureType);
+  const pedicure = validateRequest({ ...manicureRequest, service: 'pedicure', manicureType: 'gel' }, '1405-08-12');
   assert.equal(pedicure.success, true);
   if (pedicure.success) assert.equal(pedicure.data.manicureType, '');
 });
@@ -92,7 +123,7 @@ test('prepared request preserves the manicure treatment and exact time window', 
   assert.equal(valid.success, true);
   if (valid.success) {
     const message = new URL(whatsappRequestUrl(valid.data)).searchParams.get('text')!;
-    assert.match(message, /خدمات مانیکور/);
+    assert.match(message, /خدمات دست/);
     assert.match(message, /کاشت/);
     assert.match(message, /۱۴ تا ۱۶/);
   }

@@ -1,4 +1,4 @@
-import { receiptFor, type ReceiptRecord } from '../features/booking/receipt-model';
+import { bookedServiceName, receiptFor, type ReceiptRecord } from '../features/booking/receipt-model';
 import { readableDay } from '../lib/jalali';
 import { normalizeMobile, requestMessage, type BookingRequest } from '../features/booking/model';
 import { periods } from '../content/salon';
@@ -23,7 +23,7 @@ export async function sendNotification(event: NotificationEvent, env: Config = p
   if (event.channel === 'TELEGRAM') {
     const record = event.request;
     const request: BookingRequest = { name: record.name, phone: record.phone, service: record.service as BookingRequest['service'], manicureType: (record.manicureType ?? '') as BookingRequest['manicureType'], date: record.jalaliDay, period: record.period as BookingRequest['period'], note: record.note, consent: true };
-    const response = await transport(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: `اطلاع نوبت تینا\nکد: ${record.reference}\n${requestMessage(request)}` }) });
+    const response = await transport(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: `اطلاع نوبت تینا\nکد: ${record.reference}\n${requestMessage(request, bookedServiceName(record))}` }) });
     const body = await response.json();
     if (!response.ok || !body.ok || !body.result?.message_id) throw new Error('TELEGRAM_DELIVERY_FAILED');
     return String(body.result.message_id);

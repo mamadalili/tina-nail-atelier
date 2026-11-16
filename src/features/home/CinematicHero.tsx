@@ -11,7 +11,7 @@ export function CinematicHero() {
         <p className="hero-statement">هنرِ جزئیات.<br /><em>به سلیقهٔ تو.</em></p>
         </div>
         <div className="hero-details">
-        <p className="hero-intro">مانیکور و پدیکور، با توجه به چیزی که تو دوست داری.<br className="desktop-break" /> از فرم و رنگ تا آخرین جزئیات.</p>
+        <p className="hero-intro">خدمات دست و پا، با توجه به چیزی که تو دوست داری.<br className="desktop-break" /> از فرم و رنگ تا آخرین جزئیات.</p>
         <div className="hero-actions"><a className="button primary" href="#booking">درخواست وقت <Icon name="arrow" size={20} /></a></div>
         <p className="hero-location">تهران · ستارخان، حبیب‌الله شمالی</p>
         </div>
@@ -21,6 +21,6 @@ export function CinematicHero() {
         <figcaption><span className="hero-art-title" lang="en" dir="ltr">The art<br />of detail.</span></figcaption>
       </figure>
     </div>
-    <div className="hero-rail wrap"><span lang="en" dir="ltr">TINA — NAIL ATELIER</span><span>مانیکور <i aria-hidden="true">/</i> پدیکور</span><a href="#booking">وقتی برای خودت <span aria-hidden="true">↓</span></a></div>
+    <div className="hero-rail wrap"><span lang="en" dir="ltr">TINA — NAIL ATELIER</span><span>خدمات دست <i aria-hidden="true">/</i> خدمات پا</span><a href="#booking">وقتی برای خودت <span aria-hidden="true">↓</span></a></div>
   </section>;
 }
