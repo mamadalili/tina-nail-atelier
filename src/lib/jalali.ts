@@ -15,6 +15,12 @@ export function shiftMonth(year: number, month: number, delta: number) {
   return { year: Math.floor(index / 12), month: index % 12 + 1 };
 }
 
+export function nextJalaliDay(key: string): string {
+  const [year, month, day] = key.split('-').map(Number);
+  const { jy, jm, jd } = jalaali.d2j(jalaali.j2d(year, month, day) + 1);
+  return dateKey(jy, jm, jd);
+}
+
 export function monthCells(year: number, month: number): Array<number | null> {
   const first = jalaali.toGregorian(year, month, 1);
   const offset = (new Date(Date.UTC(first.gy, first.gm - 1, first.gd)).getUTCDay() + 1) % 7;

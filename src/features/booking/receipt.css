@@ -27,9 +27,9 @@
 .ticket-stub::before, .ticket-stub::after { content: ''; position: absolute; top: -10px; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); }
 .ticket-stub::before { left: -10px; }
 .ticket-stub::after { right: -10px; }
-.ticket-stub strong { display: block; margin-top: 4px; font-family: ui-monospace, monospace; font-size: .9rem; letter-spacing: .04em; }
-.ticket-stub-mark { color: var(--green); font: 500 1.6rem/.95 var(--serif); text-align: left; }
-.ticket-stub-mark em { font-weight: 500; font-style: italic; }
+.ticket-stub strong { overflow-wrap: anywhere; user-select: all; display: block; margin-top: 4px; font-family: ui-monospace, monospace; font-size: .9rem; letter-spacing: .04em; }
+.ticket-copy { flex-shrink: 0; }
+.copy-status:not(:empty) { margin-top: 8px; font-size: .85rem; color: var(--green); }
 .receipt-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-top: 22px; }
 .receipt-actions .button { min-height: 48px; font-size: .86rem; }
 .receipt-actions a { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: .8rem; color: var(--green); text-decoration: underline; text-underline-offset: 4px; }
@@ -53,12 +53,12 @@
   .ticket-location { font-size: .77rem; }
   .ticket-stub { padding: 16px 20px; }
   .ticket-stub strong { font-size: .72rem; }
-  .ticket-stub-mark { font-size: 1.3rem; }
   .receipt-actions { margin-top: 16px; justify-content: center; }
   .receipt-actions .button { flex: 1 1 auto; }
 }
 @page appointment { size: A5 portrait; margin: 12mm; }
 @media print {
+  .ticket-copy, .copy-status { display: none !important; }
   body:has(.appointment-ticket) { padding: 0 !important; background: white; }
   body:has(.appointment-ticket) *:not(:has(.receipt-experience)):not(.receipt-experience):not(.receipt-experience *) { display: none !important; }
   body:has(.appointment-ticket) :is(main, .booking-section.section, .booking-layout.wrap, .booking-frame, .receipt-preview-page) { display: block; width: 100%; margin: 0; padding: 0; border: 0; }

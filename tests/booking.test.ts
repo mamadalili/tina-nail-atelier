@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { monthCells, shiftMonth, todayInTehran, toGregorianDay, isAllowedDay } from '../src/lib/jalali';
+import { monthCells, nextJalaliDay, shiftMonth, todayInTehran, toGregorianDay, isAllowedDay } from '../src/lib/jalali';
 import { normalizeDigits, selectionErrors, validateRequest, validateSubmission, whatsappRequestUrl, type BookingRequest } from '../src/features/booking/model';
 
 test('Tehran today changes at Iran midnight instead of UTC midnight', () => {
@@ -14,6 +14,12 @@ test('Jalali calendar preserves leap Esfand and rolls Farvardin across the year'
   assert.deepEqual(shiftMonth(1404, 12, 1), { year: 1405, month: 1 });
   assert.deepEqual(shiftMonth(1405, 1, -1), { year: 1404, month: 12 });
   assert.equal(toGregorianDay('1405-01-01'), '2026-03-21');
+});
+
+test('checking the following day crosses Jalali month and leap-year boundaries', () => {
+  assert.equal(nextJalaliDay('1403-12-30'), '1404-01-01');
+  assert.equal(nextJalaliDay('1404-12-29'), '1405-01-01');
+  assert.equal(nextJalaliDay('1405-06-31'), '1405-07-01');
 });
 
 test('booking days reject past, invalid dates and dates outside 90 days', () => {

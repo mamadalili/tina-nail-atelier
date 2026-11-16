@@ -1,6 +1,6 @@
 'use client';
 
-import type { Ref } from 'react';
+import { useRef, useState, type Ref } from 'react';
 import { Icon } from '@/components/Icon';
 import { salon, periods } from '@/content/salon';
 import { faNumber, months } from '@/lib/jalali';
@@ -8,6 +8,21 @@ import type { BookingReceiptData } from './receipt-model';
 import './receipt.css';
 
 export function BookingReceipt({ receipt, preview = false, headingRef, notificationsDisabled = false }: { receipt: BookingReceiptData; preview?: boolean; headingRef?: Ref<HTMLHeadingElement>; notificationsDisabled?: boolean }) {
+  const referenceElement = useRef<HTMLElement>(null);
+  const [copyMessage, setCopyMessage] = useState('');
+  async function copyReference() {
+    try {
+      await navigator.clipboard.writeText(receipt.reference);
+      setCopyMessage('کد پیگیری کپی شد.');
+    } catch {
+      const selection = window.getSelection();
+      if (selection && referenceElement.current) {
+        const range = document.createRange(); range.selectNodeContents(referenceElement.current);
+        selection.removeAllRanges(); selection.addRange(range);
+      }
+      setCopyMessage('کد پیگیری را دستی کپی کن.');
+    }
+  }
   const [year, month, day] = receipt.date.split('-').map(Number);
   const weekday = new Intl.DateTimeFormat('fa-IR', { timeZone: 'Asia/Tehran', weekday: 'long' }).format(new Date(receipt.startsAt));
   return <div className="receipt-experience" role="region" aria-label="رسید نوبت">
@@ -22,8 +37,9 @@ export function BookingReceipt({ receipt, preview = false, headingRef, notificat
         <div className="ticket-location"><span className="ticket-label">وقت با</span><strong>{receipt.staffName}</strong></div>
         <div className="ticket-location"><span className="ticket-label">آدرس</span><span>تهران، {salon.address}</span></div>
       </div>
-      <footer className="ticket-stub"><div><span className="ticket-label">کد پیگیری نوبت</span><strong dir="ltr">{receipt.reference}</strong></div><span className="ticket-stub-mark" lang="en" dir="ltr">See you<br /><em>at Tina’s.</em></span></footer>
+      <footer className="ticket-stub"><div><span className="ticket-label">کد پیگیری نوبت</span><strong ref={referenceElement} dir="ltr">{receipt.reference}</strong></div><button type="button" className="text-button ticket-copy" onClick={copyReference}>کپی کد پیگیری</button></footer>
     </article>
+    <p className="copy-status" role="status">{copyMessage}</p>
     <div className="receipt-actions"><button type="button" className="button primary" onClick={() => window.print()}>چاپ یا ذخیرهٔ PDF</button><a href={salon.phoneLink}>تغییر وقت؟ تماس با تینا <Icon name="phone" size={17} /></a></div>
     <p className="receipt-save-hint">می‌توانی از همین رسید اسکرین‌شات بگیری.</p>
     {notificationsDisabled && <p className="receipt-save-hint">فعلاً پیامک ارسال نمی‌شود؛ رسید نوبتت را نگه دار.</p>}

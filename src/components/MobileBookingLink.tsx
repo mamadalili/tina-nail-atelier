@@ -8,7 +8,7 @@ export function MobileBookingLink() {
 
   useEffect(() => {
     if (!('IntersectionObserver' in window)) return;
-    const sections = document.querySelectorAll('.cinematic-hero, #booking');
+    const sections = document.querySelectorAll('.cinematic-hero, #booking, #contact, .site-footer');
     if (!sections.length) return;
     const inView = new Map<Element, boolean>();
     const observer = new IntersectionObserver(entries => {
@@ -19,9 +19,7 @@ export function MobileBookingLink() {
     return () => observer.disconnect();
   }, []);
 
-  return <a className="mobile-booking" href="#appointment-form" aria-label="انتخاب وقت با تینا" hidden={!visible}>
-    <span className="dock-icon"><Icon name="calendar" size={22} /></span>
-    <span className="dock-copy"><strong>وقتِ توئه.</strong><span>رزرو سریع وقت</span></span>
-    <span className="dock-action">انتخاب وقت<Icon name="arrow" size={18} /></span>
+  return <a className="mobile-booking" href="#appointment-form" hidden={!visible}>
+    <Icon name="calendar" size={19} />رزرو نوبت
   </a>;
 }

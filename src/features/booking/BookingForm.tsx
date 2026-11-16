@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { periods, services, salon, staffMembers, type ServiceId } from '@/content/salon';
 import { StaffSelector } from './StaffSelector';
-import { isAllowedDay, readableDay, todayInTehran } from '@/lib/jalali';
+import { faNumber, isAllowedDay, nextJalaliDay, readableDay, todayInTehran } from '@/lib/jalali';
 import { isUpcomingPeriod, selectionErrors, validateSubmission, type BookingRequest } from './model';
 import { JalaliCalendar } from './JalaliCalendar';
 import { BookingReceipt } from './BookingReceipt';
@@ -25,6 +25,8 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
   const [availabilityRefresh, setAvailabilityRefresh] = useState(0);
   const token = useRef<string | null>(null);
   const formHeading = useRef<HTMLHeadingElement>(null);
+  const datePanel = useRef<HTMLDivElement>(null);
+  const periodPanel = useRef<HTMLFieldSetElement>(null);
   const previousStep = useRef(0);
   const focusInvalid = useRef(false);
 
@@ -139,6 +141,23 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
   const selectedStaff = staffMembers.find(item => item.id === (data.staff ?? 'tina'))!;
   const selectedPeriod = isUpcomingPeriod(data.date, data.period, clockNow) ? periods.find(item => item.id === data.period) : undefined;
 
+  const slots = periods.map(period => {
+    const unavailable = !isUpcomingPeriod(data.date, period.id, clockNow) ? 'شروع شده' : taken.includes(period.id) ? 'در دسترس نیست' : '';
+    return { period, unavailable };
+  });
+  const freeCount = slots.filter(slot => !slot.unavailable).length;
+  const slotsReady = availability === 'ready' && isAllowedDay(data.date, currentToday);
+  const full = slotsReady && freeCount === 0;
+  const nextDay = full ? nextJalaliDay(data.date) : '';
+  const canCheckNext = nextDay !== '' && isAllowedDay(nextDay, currentToday);
+  let timeHint = 'برای دیدن ساعت‌های آزاد، یک روز انتخاب کن.';
+  if (data.date && serverEnabled) {
+    if (availability === 'error') timeHint = 'دریافت ساعت‌ها انجام نشد.';
+    else if (!isAllowedDay(data.date, currentToday)) timeHint = 'یک روز تازه از تقویم انتخاب کن.';
+    else if (!slotsReady) timeHint = 'در حال بررسی ساعت‌های خالی…';
+    else timeHint = full ? 'برای این روز ساعت آزادی باقی نمانده.' : `${faNumber(freeCount)} بازهٔ آزاد برای ${selectedStaff.name}`;
+  }
+
   if (receipt) return <BookingReceipt receipt={receipt} headingRef={formHeading} notificationsDisabled={process.env.NEXT_PUBLIC_BOOKING_ADAPTER === 'shared-host'} />;
 
   return <form className="booking-sheet" onSubmit={submit} noValidate>
@@ -160,23 +179,25 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
               <span className="service-radio" aria-hidden="true">{data.service === item.id && <Icon name="check" size={14} />}</span>
             </label>)}</div>
           </fieldset>
-          <p className="treatment-note">اگر مدل یا طرحی در ذهن داری، در مرحلهٔ بعد برایم بنویس.</p>
         </div>
-        <div className="date-panel" role="group" tabIndex={-1} aria-labelledby="visit-day-title" aria-invalid={Boolean(errors.date)} aria-describedby={errors.date ? 'date-error' : undefined}>
+        <div ref={datePanel} className="date-panel" role="group" tabIndex={-1} aria-labelledby="visit-day-title" aria-invalid={Boolean(errors.date)} aria-describedby={errors.date ? 'date-error' : undefined}>
           <h4 id="visit-day-title" className="selection-label">روز مراجعه</h4>
           {errors.date && <p className="field-error" id="date-error">{errors.date}</p>}
           <JalaliCalendar today={currentToday} selected={data.date} onSelect={key => change('date', key)} />
         </div>
-        <fieldset className="period-choice" tabIndex={-1} aria-invalid={Boolean(errors.period)} aria-describedby={errors.period ? 'period-error' : 'period-hint'}>
+        <fieldset ref={periodPanel} className="period-choice" tabIndex={-1} aria-invalid={Boolean(errors.period)} aria-describedby={errors.period ? 'period-error' : 'period-hint'}>
           <legend>ساعت مراجعه <span className="duration-note">۲ ساعت</span></legend>
           {errors.period && <p className="field-error" id="period-error">{errors.period}</p>}
-          <div className="time-grid">{periods.map(item => <label className={data.period === item.id ? 'choice time-choice selected' : 'choice time-choice'} key={item.id}>
-            <input type="radio" name="period" value={item.id} aria-label={`ساعت ${item.label}${taken.includes(item.id) ? '، رزرو شده' : ''}`} checked={data.period === item.id} disabled={!serverEnabled || availability !== 'ready' || taken.includes(item.id) || !isUpcomingPeriod(data.date, item.id, clockNow)} onChange={() => change('period', item.id)} />
-            <span>{item.label}{taken.includes(item.id) && <small>رزرو شده</small>}</span><Icon name="check" size={17} />
-          </label>)}</div>
-          <p id="period-hint" className="time-hint" aria-live="polite">{!data.date ? 'اول روز دلخواهت را انتخاب کن تا ساعت‌ها فعال شوند.' : availability === 'loading' ? 'در حال بررسی ساعت‌های خالی…' : availability === 'error' ? 'دریافت ساعت‌ها انجام نشد.' : isAllowedDay(data.date, currentToday) && periods.every(item => taken.includes(item.id) || !isUpcomingPeriod(data.date, item.id, clockNow)) ? 'در این روز بازهٔ خالی نداریم؛ روز دیگری انتخاب کن.' : 'بازهٔ مناسب خودت را انتخاب کن.'}</p>
+          <p id="period-hint" className="time-hint" role="status">{timeHint}</p>
+          {slotsReady && <div className="time-grid">{slots.map(({ period, unavailable }) => <label className={data.period === period.id ? 'choice time-choice selected' : 'choice time-choice'} key={period.id}>
+            <input type="radio" name="period" value={period.id} aria-label={`ساعت ${period.label}${unavailable ? `، ${unavailable}` : ''}`} checked={data.period === period.id} disabled={Boolean(unavailable)} onChange={() => change('period', period.id)} />
+            <span>{period.label}{unavailable && <small>{unavailable}</small>}</span><Icon name="check" size={17} />
+          </label>)}</div>}
           {availability === 'error' && <button type="button" className="text-button" onClick={() => setAvailabilityRefresh(current => current + 1)}>بررسی دوبارهٔ ساعت‌ها</button>}
-          <p className="slot-note">بعد از ثبت موفق، این زمان برای تو رزرو می‌شود.</p>
+          {full && <button type="button" className="text-button" onClick={() => {
+            if (canCheckNext) { periodPanel.current?.focus({preventScroll: true}); change('date', nextDay); }
+            else { datePanel.current?.focus({preventScroll: true}); datePanel.current?.scrollIntoView({block: 'start'}); }
+          }}>{canCheckNext ? 'بررسی روز بعد' : 'انتخاب روز دیگر'}</button>}
         </fieldset>
       </div>
       <div className="booking-next">
@@ -187,10 +208,9 @@ export function BookingForm({ today, initialNow, serverEnabled }: { today: strin
       <div className="selected-appointment"><span>{selectedStaff.name} · {selectedService.name}</span><span>{readableDay(data.date)}</span><span>ساعت {periods.find(item => item.id === data.period)?.label}</span><button className="text-button" type="button" onClick={() => setStep(0)}>تغییر وقت</button></div>
       <div className="fields-grid"><div className="field"><label htmlFor="name">نام و نام خانوادگی</label><input id="name" name="name" autoComplete="name" value={data.name} maxLength={80} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} onChange={event => change('name', event.target.value)} placeholder="نامت را بنویس" />{errors.name && <p id="name-error" className="field-error">{errors.name}</p>}</div><div className="field"><label htmlFor="phone">شمارهٔ موبایل</label><input id="phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={data.phone} maxLength={20} aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? 'phone-error' : undefined} onChange={event => change('phone', event.target.value)} placeholder="09..." />{errors.phone && <p id="phone-error" className="field-error">{errors.phone}</p>}</div></div>
       <div className="field"><label htmlFor="note">چیزی هست که قبل از وقتت بدانم؟ <span>(اختیاری)</span></label><textarea id="note" name="note" rows={3} maxLength={500} value={data.note} aria-invalid={Boolean(errors.note)} aria-describedby={errors.note ? 'note-error' : undefined} onChange={event => change('note', event.target.value)} placeholder="مثلاً مدل یا رنگ دلخواهت؛ اطلاعات حساس ننویس." />{errors.note && <p className="field-error" id="note-error">{errors.note}</p>}</div>
-      <label className="consent"><input type="checkbox" checked={data.consent} aria-invalid={Boolean(errors.consent)} aria-describedby={errors.consent ? 'consent-error' : undefined} onChange={event => change('consent', event.target.checked)} /><span>با استفاده از این اطلاعات برای هماهنگی وقتم موافقم. <Link href="/privacy">حریم خصوصی</Link></span></label>
+      <label className="consent"><input type="checkbox" checked={data.consent} aria-invalid={Boolean(errors.consent)} aria-describedby={errors.consent ? 'consent-error' : undefined} onChange={event => change('consent', event.target.checked)} /><span>با استفاده از این اطلاعات برای هماهنگی وقتم موافقم. <Link href="/privacy" target="_blank" rel="noopener noreferrer">حریم خصوصی<span className="sr-only"> (در برگهٔ تازه)</span></Link></span></label>
       {errors.consent && <p className="field-error" id="consent-error">{errors.consent}</p>}
       <button type="submit" disabled={pending || !serverEnabled} className="button primary full booking-cta">{pending ? 'در حال رزرو وقت…' : 'رزرو نهایی و دریافت رسید'}<Icon name="check" size={20} /></button>
-      <p className="form-disclaimer">پس از ثبت موفق، رسید نهایی نوبتت همین‌جا نمایش داده می‌شود.</p>
       <a className="form-contact" href={salon.phoneLink}>ترجیح می‌دهی تلفنی هماهنگ کنی؟ تماس با تینا</a>
     </>}
     </fieldset>
