@@ -21,6 +21,7 @@ export function AdminPanel() {
   const [view, setView] = useState(() => { const [year, month] = todayInTehran().split('-').map(Number); return { year, month }; });
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
   const [staff, setStaff] = useState<StaffId>('tina');
+  const [username, setUsername] = useState<StaffId | ''>('');
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -39,14 +40,23 @@ export function AdminPanel() {
     return data;
   }, []);
 
+  const enterPanel = useCallback((value: unknown) => {
+    const account = staffMembers.find(person => person.id === value);
+    if (!account) throw new Error('Invalid session identity');
+    setUsername(account.id);
+    setStaff(account.id);
+    setPhase('ready');
+  }, []);
+
   const loadStatus = useCallback(async () => {
     setPhase('checking');
     try {
       const status = await api('status'); csrf.current = status.csrf; setConfigured(status.configured === true);
       if (typeof status.now === 'string') { const date = todayInTehran(new Date(status.now)); setToday(date); }
-      setPhase(status.authenticated === true ? 'ready' : 'login');
+      if (status.authenticated === true) enterPanel(status.username);
+      else { setUsername(''); setPhase('login'); }
     } catch { setMessage('ارتباط با پنل برقرار نشد. دوباره تلاش کن.'); setPhase('error'); }
-  }, [api]);
+  }, [api, enterPanel]);
   useEffect(() => { void loadStatus(); }, [loadStatus]);
 
   useEffect(() => {
@@ -63,7 +73,7 @@ export function AdminPanel() {
 
   async function login(event: React.FormEvent) {
     event.preventDefault();if (pending) return;setPending(true);setMessage('');
-    try { const status = await api('login', { password });csrf.current = status.csrf;setPhase('ready');setFailed(false); }
+    try { const status = await api('login', { username, password }); csrf.current = status.csrf; enterPanel(status.username); setFailed(false); }
     catch (error) { setFailed(true);setMessage(error instanceof ApiFailure ? error.message : 'ورود انجام نشد؛ دوباره تلاش کن.'); }
     finally { setPassword('');setPending(false); }
   }
@@ -96,9 +106,31 @@ export function AdminPanel() {
   const slots = current ? daySlots(day, current.appointments, current.blocks) : [];
   const cancelled = current?.appointments.filter(item => item.date === day && item.status === 'CANCELLED') ?? [];
 
-  if (phase !== 'ready') return <main className="admin-login-shell"><section className="admin-login"><a href="/tina-preview/" className="admin-wordmark" lang="en" dir="ltr">Tina<span>.</span></a><p className="admin-eyebrow">مدیریت نوبت‌ها</p><h1>سلام تینا.</h1>{phase === 'checking' ? <p role="status">در حال باز کردن پنل…</p> : phase === 'error' ? <><p role="alert">{message}</p><button className="admin-button primary" onClick={() => void loadStatus()}>تلاش دوباره</button></> : <><p className="admin-login-intro">برای دیدن و مدیریت نوبت‌ها، رمز ورودت را بنویس.</p>{!configured && <p className="admin-feedback" role="status">رمز پنل هنوز راه‌اندازی نشده است.</p>}<form onSubmit={login}><label htmlFor="admin-password">رمز ورود<input id="admin-password" type="password" value={password} autoComplete="current-password" required disabled={pending || !configured} onChange={event => setPassword(event.target.value)} /></label>{message && <p className="admin-feedback error" role="alert">{message}</p>}<button className="admin-button primary" disabled={pending || !configured}>{pending ? 'در حال ورود…' : 'ورود به پنل'}</button></form></>}<a className="admin-back-link" href="/tina-preview/">دیدن سایت تینا</a></section></main>;
+  if (phase !== 'ready') return <main className="admin-login-shell">
+    <section className="admin-login">
+      <a href="/tina-preview/" className="admin-wordmark" lang="en" dir="ltr">Tina<span>.</span></a>
+      <h1>ورود به پنل مدیریت</h1>
+      {phase === 'checking' ? <p role="status">در حال باز کردن پنل…</p> : phase === 'error' ? <>
+        <p role="alert">{message}</p><button className="admin-button primary" onClick={() => void loadStatus()}>تلاش دوباره</button>
+      </> : <form onSubmit={login}>
+        {!configured && <p className="admin-feedback" role="status">رمز پنل هنوز راه‌اندازی نشده است.</p>}
+        <label htmlFor="admin-username">نام کاربری
+          <select id="admin-username" name="username" autoComplete="username" value={username} required disabled={pending || !configured} onChange={event => setUsername(event.target.value as StaffId)}>
+            <option value="" disabled>نام کاربری را انتخاب کن</option>
+            {staffMembers.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
+          </select>
+        </label>
+        <label htmlFor="admin-password">رمز ورود
+          <input id="admin-password" name="password" type="password" value={password} autoComplete="current-password" required disabled={pending || !configured} onChange={event => setPassword(event.target.value)} />
+        </label>
+        {message && <p className="admin-feedback error" role="alert">{message}</p>}
+        <button className="admin-button primary" disabled={pending || !configured}>{pending ? 'در حال ورود…' : 'ورود به پنل'}</button>
+      </form>}
+      <a className="admin-back-link" href="/tina-preview/">دیدن سایت تینا</a>
+    </section>
+  </main>;
 
-  return <div className="admin-app"><header className="admin-header"><div><a className="admin-wordmark" lang="en" dir="ltr" href="/tina-preview/">Tina<span>.</span></a><span>مدیریت نوبت‌ها</span></div><nav aria-label="ابزارهای پنل"><a href="/tina-preview/" target="_blank" rel="noopener">دیدن سایت</a><button disabled={pending} onClick={() => void logout()}>خروج</button></nav></header>
+  return <div className="admin-app"><header className="admin-header"><div><a className="admin-wordmark" lang="en" dir="ltr" href="/tina-preview/">Tina<span>.</span></a><span>پنل مدیریت {staffMembers.find(person => person.id === username)?.name}</span></div><nav aria-label="ابزارهای پنل"><a href="/tina-preview/" target="_blank" rel="noopener">دیدن سایت</a><button disabled={pending} onClick={() => void logout()}>خروج</button></nav></header>
     <main className="admin-main"><div className="admin-page-title"><div><span className="admin-eyebrow">تقویم کاری تو</span><h1>نوبت‌ها، یک‌جا.</h1><p>یک روز را انتخاب کن؛ نوبت‌ها و ساعت‌های خالی همان روز را ببین.</p></div><button className="admin-button secondary" disabled={loading || pending} onClick={() => { setMessage('');setRefresh(value => value + 1); }}>{loading ? 'در حال دریافت…' : 'تازه‌کردن'}</button></div>
     {message && <p className={`admin-feedback${failed ? ' error' : ''}`} role={failed ? 'alert' : 'status'}>{message}</p>}
     <div className="admin-staff-bar"><StaffSelector name="admin-staff" legend="تقویم کدام نفر؟" value={staff} disabled={pending || loading} onChange={value => { setStaff(value);setLoading(true);setMessage('');setDialog(null); }} /></div>

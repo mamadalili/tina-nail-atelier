@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 
+const adminHref = process.env.NEXT_PUBLIC_BOOKING_ADAPTER === 'shared-host'
+  ? '/tina-administrator/'
+  : 'https://mrdalili.ir/tina-administrator/';
+
 export function Header() {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -18,7 +22,10 @@ export function Header() {
     <nav ref={menu} id="site-navigation" aria-label="منوی اصلی" className={open ? 'main-nav is-open' : 'main-nav'}>
       {[['#services', 'خدمات'], ['#colour', 'نگاه به رنگ'], ['#about', 'دربارهٔ تینا'], ['#contact', 'تماس']].map(([url, label]) => <a key={url} href={url} onClick={() => setOpen(false)}>{label}</a>)}
     </nav>
-    <a className="header-book" href="#booking">درخواست وقت <Icon name="calendar" size={18} /></a>
+    <div className="header-actions">
+      <a className="header-book" href="#booking">درخواست وقت <Icon name="calendar" size={18} /></a>
+      <a className="header-admin" href={adminHref}>پنل مدیریت</a>
+    </div>
     <button ref={menuButton} className="menu-toggle" type="button" aria-controls="site-navigation" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'بستن' : 'فهرست'}<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">{open ? <path d="m6 6 12 12M6 18 18 6" /> : <path d="M4 8h16M4 16h16" />}</svg></button>
   </header>;
 }

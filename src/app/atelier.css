@@ -57,6 +57,9 @@
   .main-nav a:hover { color: var(--red); border-color: var(--red); }
   .header-book { display: inline-flex; align-items: center; gap: 20px; min-height: 48px; padding: 10px 20px; font-size: .85rem; background: var(--green); color: var(--on-dark); border-radius: var(--radius); transition: background 180ms; }
   .header-book:hover { background: var(--green-hover); }
+  .header-actions { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .header-admin { display: inline-flex; align-items: center; min-height: 48px; padding: 8px 16px; border: 1px solid var(--control-line); border-radius: var(--radius); font-size: .85rem; color: var(--green); }
+  .header-admin:hover { background: var(--green-soft); }
   .menu-toggle { display: none; }
   .button { display: inline-flex; align-items: center; justify-content: center; gap: 32px; min-height: 56px; padding: 13px 24px; border: 1px solid transparent; border-radius: var(--radius); font-size: .94rem; font-weight: 500; transition: background 180ms, transform 200ms var(--ease); }
   .button:hover { transform: translateY(-2px); }
@@ -403,7 +406,8 @@
     .site-header { min-height: 88px; gap: 20px; }
     .wordmark { font-size: 2.8rem; }
     .wordmark small { margin-top: 10px; font-size: .46rem; }
-    .header-book { margin-inline-start: auto; min-height: 44px; padding: 8px 14px; font-size: .78rem; }
+    .header-actions { margin-inline-start: auto; gap: 6px; }
+    .header-book, .header-admin { min-height: 44px; padding: 8px 10px; font-size: .78rem; }
     .header-book svg { display: none; }
     .menu-toggle { display: flex; align-items: center; gap: 8px; min-height: 44px; padding-inline: 2px; font-size: .78rem; }
     .main-nav { display: none; position: absolute; top: calc(100% + 8px); right: 0; left: 0; z-index: 20; margin: 0; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 12px 24px #122a1d18; }
@@ -506,9 +510,15 @@
     .dock-action { gap: 8px; padding-inline: 12px; font-size: .82rem; }
     .legal-page main { margin-block: 40px; }
   }
+  @media (max-width: 400px) {
+    .site-header { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding-block: 6px 12px; }
+    .site-header .wordmark { justify-self: start; }
+    .menu-toggle { grid-area: 1 / 2; }
+    .header-actions { grid-area: 2 / 1 / 3 / -1; display: grid; grid-template-columns: 1fr 1fr; margin: 0; }
+    .header-book, .header-admin { justify-content: center; }
+  }
   @media (max-width: 374px) {
-    .site-header { gap: 12px; }
-    .header-book { padding-inline: 12px; }
+    .header-book, .header-admin { padding-inline: 8px; }
     .menu-toggle { gap: 6px; }
     .hero h1 { font-size: 4rem; }
     .hero-statement { font-size: 1.3rem; }
