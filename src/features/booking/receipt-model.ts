@@ -1,9 +1,13 @@
 import { z } from 'zod';
-import { manicureOptions, periods, services, staffMembers } from '../../content/salon';
+import { manicureOptions, periods, services, staffMembers, type StaffId } from '../../content/salon';
 import { toGregorianDay } from '../../lib/jalali';
 
-export const receiptSchema = z.object({
-  reference: z.string().regex(/^TN-[A-F0-9]{16,32}$/),
+const reference = z.string().regex(/^TN-[A-F0-9]{16,32}$/);
+export const receiptProofSchema = z.object({ reference, requestKey: z.uuidv4() });
+export type ReceiptProof = z.infer<typeof receiptProofSchema>;
+
+const receiptFields = z.object({
+  reference,
   status: z.literal('CONFIRMED'),
   name: z.string().min(2).max(80),
   service: z.string().min(1),
@@ -14,8 +18,19 @@ export const receiptSchema = z.object({
   endsAt: z.iso.datetime(),
   issuedAt: z.iso.datetime(),
   staff: z.enum(staffMembers.map(item => item.id)).default('tina'),
-}).transform(data => ({ ...data, staffName: staffMembers.find(item => item.id === data.staff)!.name }));
+});
+
+function withStaffName<T extends { staff: StaffId }>(data: T) {
+  return { ...data, staffName: staffMembers.find(item => item.id === data.staff)!.name };
+}
+
+export const receiptSchema = receiptFields.transform(data => withStaffName(data));
 export type BookingReceiptData = z.infer<typeof receiptSchema>;
+export const savedReceiptSchema = receiptFields.extend({
+  status: z.enum(['CONFIRMED', 'CANCELLED']),
+  updatedAt: z.iso.datetime(),
+}).transform(data => withStaffName(data));
+export type SavedBookingReceipt = z.infer<typeof savedReceiptSchema>;
 
 export function slotTimes(day: string, periodId: string) {
   const period = periods.find(item => item.id === periodId);
@@ -39,12 +54,20 @@ export function bookedServiceName(record: Pick<ReceiptRecord, 'service' | 'recei
   return record.receiptServiceName ?? originalServiceNames[service.id];
 }
 
-export function receiptFor(record: ReceiptRecord): BookingReceiptData {
-  if (record.status !== 'CONFIRMED') throw new Error('BOOKING_NOT_CONFIRMED');
+function receiptFieldsFor(record: ReceiptRecord) {
   const slot = slotTimes(record.jalaliDay, record.period);
-  return receiptSchema.parse({
+  return {
     reference: record.reference, status: record.status, name: record.name, service: bookedServiceName(record),
     treatment: record.service === 'manicure' ? manicureOptions.find(item => item.id === record.manicureType)?.label ?? '' : '',
     date: record.jalaliDay, period: record.period, startsAt: slot.startsAt.toISOString(), endsAt: slot.endsAt.toISOString(), issuedAt: record.createdAt.toISOString(), staff: record.staff ?? 'tina',
-  });
+  };
+}
+
+export function receiptFor(record: ReceiptRecord): BookingReceiptData {
+  if (record.status !== 'CONFIRMED') throw new Error('BOOKING_NOT_CONFIRMED');
+  return receiptSchema.parse(receiptFieldsFor(record));
+}
+
+export function currentReceiptFor(record: ReceiptRecord & { updatedAt: Date }): SavedBookingReceipt {
+  return savedReceiptSchema.parse({ ...receiptFieldsFor(record), updatedAt: record.updatedAt.toISOString() });
 }

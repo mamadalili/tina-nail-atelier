@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/server/db';
+import { issueBookingMetric } from '@/server/booking-metrics';
 import { isAllowedOrigin } from '@/server/request-origin';
 import { reserveAppointment, ReservationError } from '@/server/reservations';
 
@@ -20,7 +21,11 @@ export async function POST(request: NextRequest) {
     body = JSON.parse(raw);
   } catch { return NextResponse.json({ message: 'اطلاعات درخواست خوانده نشد.' }, { status: 400, headers }); }
   try {
-    const result = await reserveAppointment(getDb(), key, body);
+    const db = getDb();
+    const result = await reserveAppointment(db, key, body);
+    if (!result.repeated) {
+      await issueBookingMetric(db, request.headers.get('x-booking-measurement')).catch(() => { /* The booking has already succeeded. */ });
+    }
     return NextResponse.json({ receipt: result.receipt }, { status: result.repeated ? 200 : 201, headers });
   } catch (error) {
     if (error instanceof ReservationError) return NextResponse.json({ code: error.code, message: error.message, errors: error.errors }, { status: error.status, headers });

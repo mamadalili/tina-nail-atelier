@@ -55,3 +55,14 @@ model OutboxEvent {
 
   @@index([sentAt, retryAt])
 }
+
+model BookingJourney {
+  id            String   @id @db.Uuid
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  started       Boolean  @default(false)
+  elapsedMs     Int?
+  receiptIssued Boolean  @default(false)
+  receiptSeen   Boolean  @default(false)
+
+  @@index([createdAt])
+}

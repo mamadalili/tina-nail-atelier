@@ -36,7 +36,9 @@ await transform('src/components/Header.tsx', [['href="/"', 'href="/tina-preview/
 await transform('src/app/receipt-preview/page.tsx', [["export const dynamic = 'force-dynamic';", "export const dynamic = 'force-static';"]]);
 await transform('src/app/robots.ts', [["export default", "export const dynamic = 'force-static';\n\nexport default"]]);
 const revision = spawnSync('git', ['-c', `safe.directory=${repo.replaceAll('\\', '/')}`, 'rev-parse', '--short', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
-await transform('src/app/layout.tsx', [['export const metadata: Metadata = {', `export const metadata: Metadata = {\n  other: { 'tina-preview-release': 'booking-20261104', 'tina-preview-source': '${revision}' },`]]);
+if (!/^[a-f0-9]{7,40}$/.test(revision)) throw new Error('Missing source revision');
+const releaseTag = 'booking-' + revision;
+await transform('src/app/layout.tsx', [['export const metadata: Metadata = {', `export const metadata: Metadata = {\n  other: { 'tina-preview-release': '${releaseTag}', 'tina-preview-source': '${revision}' },`]]);
 const env = { ...process.env, DATABASE_URL: '', SITE_URL: '', NEXT_PUBLIC_BOOKING_ADAPTER: 'shared-host', NEXT_PUBLIC_BASE_PATH: '/tina-preview', NEXT_PUBLIC_RELEASE_REVISION: revision, RECEIPT_PREVIEW_ENABLED: 'true', NEXT_TELEMETRY_DISABLED: '1' };
 for (const [binary, args] of [['node', ['node_modules/prisma/build/index.js', 'generate']], ['node', ['node_modules/next/dist/bin/next', 'build', '--webpack']]]) {
   const result = spawnSync(binary, args, { cwd: stage, env, stdio: 'inherit' });
@@ -45,11 +47,13 @@ for (const [binary, args] of [['node', ['node_modules/prisma/build/index.js', 'g
 const publicDir = join(release, 'public_html/tina-preview');
 await cp(join(stage, 'out'), publicDir, { recursive: true, filter: path => !['.gitkeep', 'burgundy-colour-study.png'].includes(path.split(/[\\/]/).at(-1)) });
 await mkdir(join(publicDir, 'api'), { recursive: true });
-await cp(join(repo, 'deploy/shared-host/public/booking.php'), join(publicDir, 'api/booking.php'));
+for (const endpoint of ['booking.php', 'options.php', 'receipt.php', 'metrics.php', 'services.php']) {
+  await cp(join(repo, 'deploy/shared-host/public', endpoint), join(publicDir, 'api', endpoint));
+}
 await cp(join(repo, 'deploy/shared-host/runtime'), join(release, 'tina-booking-runtime'), { recursive: true });
 await writeFile(join(release, 'tina-booking-runtime/.htaccess'), 'Require all denied\n');
-await writeFile(join(publicDir, '.htaccess'), `Options -Indexes\nDirectoryIndex index.html\n<IfModule mime_module>\nAddHandler application/x-httpd-ea-php84 .php\n</IfModule>\n<IfModule mod_headers.c>\nHeader always set X-Robots-Tag "noindex, nofollow"\nHeader always set X-Tina-Preview-Release "booking-20261104"\n<FilesMatch "\\.(html|txt|json)$">\nHeader set Cache-Control "no-cache, must-revalidate"\n</FilesMatch>\n</IfModule>\n`);
-await writeFile(join(publicDir, 'preview-release.json'), JSON.stringify({ source_commit: revision, release: 'booking-20261104', booking_live: true, notifications: false }));
+await writeFile(join(publicDir, '.htaccess'), `Options -Indexes\nDirectoryIndex index.html\n<IfModule mime_module>\nAddHandler application/x-httpd-ea-php84 .php\n</IfModule>\n<IfModule mod_headers.c>\nHeader always set X-Robots-Tag "noindex, nofollow"\nHeader always set X-Tina-Preview-Release "${releaseTag}"\n<FilesMatch "\\.(html|txt|json)$">\nHeader set Cache-Control "no-cache, must-revalidate"\n</FilesMatch>\n</IfModule>\n`);
+await writeFile(join(publicDir, 'preview-release.json'), JSON.stringify({ source_commit: revision, release: releaseTag, booking_live: true, notifications: false }));
 
 const adminStage = await mkdtemp(join(parent, 'tina-admin-stage-'));
 for (const name of ['src', 'tsconfig.json', 'next-env.d.ts', 'package.json', 'package-lock.json']) {

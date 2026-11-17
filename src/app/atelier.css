@@ -54,8 +54,8 @@
   .main-nav { display: flex; margin-inline: auto; gap: 32px; }
   .main-nav a { display: inline-flex; align-items: center; min-height: 44px; padding-block: 8px; font-size: .85rem; border-bottom: 1px solid transparent; transition: color 180ms, border-color 180ms; }
   .main-nav a:hover { color: var(--red); border-color: var(--red); }
-  .header-book { display: inline-flex; align-items: center; gap: 20px; min-height: 48px; padding: 10px 20px; font-size: .85rem; background: var(--green); color: var(--on-dark); border-radius: var(--radius); transition: background 180ms; }
-  .header-book:hover { background: var(--green-hover); }
+  .header-book { display: inline-flex; align-items: center; gap: 20px; min-height: 48px; padding: 10px 20px; font-size: .85rem; background: var(--red); color: var(--on-dark); border-radius: var(--radius); transition: background 180ms; }
+  .header-book:hover { background: var(--red-hover); }
   .header-actions { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
   .header-admin { display: inline-flex; align-items: center; min-height: 48px; padding: 8px 16px; border: 1px solid var(--control-line); border-radius: var(--radius); font-size: .85rem; color: var(--green); }
   .header-admin:hover { background: var(--green-soft); }
@@ -472,7 +472,7 @@
     .footer-wordmark { font-size: 3rem; }
     .footer-identity ul { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 24px; }
     .site-footer a:last-child { justify-self: end; }
-    .mobile-booking { position: fixed; z-index: 9; inset-inline-end: 16px; bottom: calc(12px + env(safe-area-inset-bottom)); display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 16px; border-radius: var(--radius); color: var(--on-dark); background: var(--green); box-shadow: 0 3px 12px #122a1d33; }
+    .mobile-booking { position: fixed; z-index: 9; inset-inline-end: 16px; bottom: calc(12px + env(safe-area-inset-bottom)); display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 16px; border-radius: var(--radius); color: var(--on-dark); background: var(--red); box-shadow: 0 3px 12px #35141d33; }
     .legal-page main { margin-block: 40px; }
   }
   @media (max-width: 400px) {

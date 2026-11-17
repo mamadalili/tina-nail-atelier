@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { Icon } from '@/components/Icon';
 import { ServiceIndex } from '@/features/services/ServiceIndex';
+import '@/features/services/services.css';
 import { ColourStudy } from '@/features/colour/ColourStudy';
 import { BookingForm } from '@/features/booking/BookingForm';
 import { salon } from '@/content/salon';
@@ -36,7 +37,7 @@ export default function Home() {
 
       <section id="services" tabIndex={-1} className="services-section wrap section" aria-labelledby="services-title">
         <Reveal><div className="section-heading"><div><h2 id="services-title">خدمات دست و پا</h2></div><p>برای دیدن توضیحات و رزرو، یکی از خدمات را باز کن.</p></div><ServiceIndex /></Reveal>
-        <p className="service-footnote"><a href={salon.phoneLink}>استعلام تعرفه و جزئیات طراحی از تینا <Icon name="phone" size={16} /></a></p>
+        <p className="service-footnote"><a href={salon.phoneLink}>استعلام تلفنی از سالن <Icon name="phone" size={16} /></a></p>
       </section>
 
       <section id="colour" tabIndex={-1} className="colour-section" aria-labelledby="colour-heading">

@@ -51,7 +51,7 @@ export function isUpcomingPeriod(day: string, period: string, now = new Date()) 
   if (day > today) return true;
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tehran', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(now);
   const value = (type: string) => Number(parts.find(part => part.type === type)!.value);
-  return slot.startHour * 3600 >= value('hour') * 3600 + value('minute') * 60 + value('second');
+  return slot.startHour * 3600 >= value('hour') * 3600 + value('minute') * 60 + value('second') + now.getMilliseconds() / 1000;
 }
 
 export function selectionErrors(data: BookingRequest, now = new Date()) {

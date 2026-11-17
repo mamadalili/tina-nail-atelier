@@ -132,6 +132,37 @@ final class BookingStore {
         return ['date'=>$day,'taken'=>$query->fetchAll(PDO::FETCH_COLUMN)];
     }
 
+    private static function jalaliDay(DateTimeImmutable $tehranDay): string {
+        $date = $tehranDay->format('Y-m-d');
+        $anchors = require __DIR__.'/calendar.php';
+        foreach (array_reverse($anchors, true) as $year => [$firstDay, $leap]) {
+            if ($date < $firstDay) continue;
+            $first = new DateTimeImmutable($firstDay, $tehranDay->getTimezone());
+            $offset = (int)$first->diff($tehranDay)->format('%a');
+            if ($offset >= ($leap ? 366 : 365)) break;
+            $month = $offset < 186 ? 1 + intdiv($offset, 31) : 7 + intdiv($offset - 186, 30);
+            $day = $offset < 186 ? 1 + $offset % 31 : 1 + ($offset - 186) % 30;
+            return sprintf('%04d-%02d-%02d', $year, $month, $day);
+        }
+        throw new RuntimeException('CALENDAR_OUT_OF_RANGE');
+    }
+
+    public function bookingOptions(DateTimeImmutable $now): array {
+        $localDay = $now->setTimezone(new DateTimeZone('Asia/Tehran'))->setTime(0, 0);
+        $from = self::jalaliDay($localDay);
+        $through = self::jalaliDay($localDay->modify('+90 days'));
+        $query = $this->db->prepare("SELECT staff,jalali_day AS date,period FROM appointments
+            WHERE status='CONFIRMED' AND staff IN ('tina','sonia') AND jalali_day BETWEEN ? AND ?
+            UNION ALL SELECT staff,jalali_day AS date,period FROM slot_blocks
+            WHERE staff IN ('tina','sonia') AND jalali_day BETWEEN ? AND ?
+            ORDER BY date,period,staff");
+        $query->execute([$from, $through, $from, $through]);
+        return [
+            'asOf' => $now->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.v\Z'),
+            'taken' => $query->fetchAll(PDO::FETCH_ASSOC),
+        ];
+    }
+
     public function reserve(string $key,mixed $input,string $client,DateTimeImmutable $now): array {
         if (!preg_match('/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/iD',$key)) throw new BookingFailure('BAD_KEY',400,'شناسهٔ درخواست معتبر نیست؛ صفحه را دوباره باز کن.');
         $key=strtolower($key);
@@ -174,6 +205,28 @@ final class BookingStore {
         if($q->fetchColumn())throw new BookingFailure('SLOT_TAKEN',409,'این ساعت در دسترس نیست؛ ساعت دیگری انتخاب کن.',['period'=>'این ساعت رزرو یا بسته شده است.']);
     }
 
+    public function guestReceipt(mixed $reference, mixed $requestKey): ?array {
+        if (!is_string($reference) || !preg_match('/^TN-[A-F0-9]{16,32}$/D', $reference)) return null;
+        if (!is_string($requestKey) || !preg_match('/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/iD', $requestKey)) return null;
+        $query = $this->db->prepare("SELECT reference, status, receipt, staff, jalali_day, period, created_at, updated_at FROM appointments WHERE reference=? AND request_key=? AND status IN ('CONFIRMED','CANCELLED')");
+        $query->execute([$reference, strtolower($requestKey)]);
+        $row = $query->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+
+        $issued = json_decode($row['receipt'], true, 32, JSON_THROW_ON_ERROR);
+        $day = self::gregorian($row['jalali_day']);
+        $start = new DateTimeImmutable($day.' '.self::PERIODS[$row['period']].':00:00', new DateTimeZone('Asia/Tehran'));
+        $utc = new DateTimeZone('UTC');
+        $iso = static fn(DateTimeImmutable $time) => $time->setTimezone($utc)->format('Y-m-d\TH:i:s.v\Z');
+        return [
+            'reference'=>$row['reference'], 'status'=>$row['status'], 'name'=>$issued['name'],
+            'service'=>$issued['service'], 'treatment'=>$issued['treatment'] ?? '',
+            'staff'=>$row['staff'], 'staffName'=>self::STAFF[$row['staff']],
+            'date'=>$row['jalali_day'], 'period'=>$row['period'], 'startsAt'=>$iso($start), 'endsAt'=>$iso($start->modify('+2 hours')),
+            'issuedAt'=>$row['created_at'], 'updatedAt'=>$iso(new DateTimeImmutable($row['updated_at'] ?? $row['created_at'])),
+        ];
+    }
+
     private static function adminRecord(array $row):array {
         $data=json_decode($row['payload'],true,512,JSON_THROW_ON_ERROR);
         return ['reference'=>$row['reference'],'status'=>$row['status'],'version'=>(int)$row['version'],'name'=>$data['name'],'phone'=>$data['phone'],'service'=>$data['service'],'manicureType'=>$data['manicureType']??'','date'=>$row['jalali_day'],'period'=>$row['period'],'note'=>$data['note'],'issuedAt'=>$row['created_at'],'updatedAt'=>$row['updated_at'],'staff'=>$row['staff']];
@@ -187,6 +240,15 @@ final class BookingStore {
         $records=array_map([self::class,'adminRecord'],$q->fetchAll(PDO::FETCH_ASSOC));
         $q=$this->db->prepare('SELECT jalali_day AS date,period,staff FROM slot_blocks WHERE jalali_day LIKE ? AND staff=? ORDER BY jalali_day,period');$q->execute([$month.'-%',$staff]);
         return ['month'=>$month,'staff'=>$staff,'appointments'=>$records,'blocks'=>$q->fetchAll(PDO::FETCH_ASSOC)];
+    }
+
+    public function adminFind(mixed $input): ?array {
+        $reference = is_string($input) ? strtoupper(trim($input)) : '';
+        if (!preg_match('/^TN-[A-F0-9]{16,32}$/D',$reference)) self::invalid('reference','کد پیگیری کامل روی رسید را وارد کن.');
+        $q = $this->db->prepare('SELECT reference,staff,jalali_day AS date,period,status FROM appointments WHERE reference=?');
+        $q->execute([$reference]);
+        $row = $q->fetch(PDO::FETCH_ASSOC);
+        return $row === false ? null : $row;
     }
 
     private function editableRecord(string $reference,int $version):array {

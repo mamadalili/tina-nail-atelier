@@ -17,6 +17,7 @@ await mkdir(join(publicRoot, 'tina-administrator'), { recursive: true });
 await mkdir(join(publicRoot, 'tina-preview/api'), { recursive: true });
 await cp('deploy/shared-host/public/admin.php', join(publicRoot, 'tina-administrator/api.php'));
 await cp('deploy/shared-host/public/booking.php', join(publicRoot, 'tina-preview/api/booking.php'));
+await cp('deploy/shared-host/public/metrics.php', join(publicRoot, 'tina-preview/api/metrics.php'));
 const password = 'Only-local-test-42!';
 const hash = spawnSync(php, ['-r', '$p = file_get_contents("php://stdin"); echo json_encode(["tina"=>password_hash($p,PASSWORD_BCRYPT), "sonia"=>password_hash($p,PASSWORD_BCRYPT)]);'], { input: password, encoding: 'utf8' });
 assert.ok(hash.status === 0, 'Generate only a local test credential');
@@ -36,6 +37,8 @@ try {
   for (let i = 0; i < 60 && !ready; i++) { try { const response = await api('status'); const status = await response.json(); csrf = status.csrf; ready = response.ok; } catch { await new Promise(resolve => setTimeout(resolve, 100)); } }
   assert.ok(ready, 'PHP endpoint starts');
   assert.equal((await api('month&month=1405-08')).status, 401);
+  assert.equal((await api('search', { reference: 'TN-1234567890ABCDEF' })).status, 401);
+  assert.equal((await api('metrics')).status, 401);
   assert.equal((await api('login', { password }, { Origin: 'https://foreign.invalid' })).status, 403);
   assert.equal((await api('login', { password }, { 'X-CSRF-Token': 'invalid' })).status, 403);
   assert.equal((await api('login', { password })).status, 422);
@@ -49,6 +52,30 @@ try {
   assert.ok(login.headers.getSetCookie().some(value => /HttpOnly/i.test(value) && /SameSite=Strict/i.test(value) && /path=\/tina-administrator\//i.test(value)), 'Cookie is private and scoped');
   const signedIn = await login.json(); assert.equal(signedIn.username, 'tina'); csrf = signedIn.csrf;
   assert.equal((await (await api('status')).json()).username, 'tina');
+  assert.equal((await api('search', { reference: '' })).status, 422);
+  assert.equal((await api('search', { reference: 'TN-1234' })).status, 422);
+  assert.equal((await api('search', { reference: 'TN-1234567890ABCDEF' })).status, 404);
+  assert.equal((await api('search', { reference: 'TN-1234567890ABCDEF' }, { 'X-CSRF-Token': 'invalid' })).status, 403);
+  assert.deepEqual(await (await api('metrics')).json(), { days: 30, starts: 0, selections: 0, receipts: 0, medianMs: null });
+  assert.equal((await api('metrics&period=forever')).status, 422);
+  const metricsUrl = origin + '/tina-preview/api/metrics.php';
+  const journey = randomUUID();
+  const replayJourney = randomUUID();
+  const metric = (body: object | string, source = origin, type = 'application/json') => fetch(metricsUrl, { method: 'POST',
+    headers: { Origin: source, 'Content-Type': type }, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  assert.equal((await fetch(metricsUrl)).status, 405);
+  assert.equal((await metric({}, 'https://foreign.invalid')).status, 403);
+  assert.equal((await metric({}, origin, 'text/plain')).status, 415);
+  assert.equal((await metric('[')).status, 400);
+  assert.equal((await metric('x'.repeat(257))).status, 413);
+  assert.equal((await metric({ event: 'start', id: journey, phone: 'guest' })).status, 422);
+  for (const id of [journey, replayJourney]) {
+    assert.equal((await metric({ event: 'start', id })).status, 204);
+    assert.equal((await metric({ event: 'start', id })).status, 204);
+    assert.equal((await metric({ event: 'selected', id, elapsedMs: id === journey ? 16000 : 11000 })).status, 204);
+    assert.equal((await metric({ event: 'receipt', id })).status, 204);
+  }
+  assert.deepEqual(await (await api('metrics')).json(), { days: 30, starts: 2, selections: 2, receipts: 0, medianMs: 13500 });
   const day = todayInTehran(new Date(Date.now() + 12 * 86400000));
   const month = day.slice(0, 7);
   assert.equal((await api('block', { date: day, period: '16-18', blocked: true })).status, 200);
@@ -61,12 +88,23 @@ try {
   assert.deepEqual((await (await fetch(`${bookUrl}?date=${day}&staff=tina`)).json()).taken, ['16-18']);
   assert.equal((await fetch(`${bookUrl}?date=${day}&staff=other`)).status, 422);
   const data = { name: 'آزمون محلی پنل', phone: '09000000000', service: 'pedicure', manicureType: '', date: day, period: '10-12', note: '', consent: true };
-  const booking = await fetch(bookUrl, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() }, body: JSON.stringify(data) });
+  const bookingKey = randomUUID();
+  const reserve = (id: string) => fetch(bookUrl, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json',
+    'Idempotency-Key': bookingKey, 'X-Booking-Measurement': id }, body: JSON.stringify(data) });
+  const booking = await reserve(journey);
   assert.equal(booking.status, 201);
   const reference = (await booking.json()).receipt.reference;
+  assert.equal((await reserve(replayJourney)).status, 200);
+  for (const id of [journey, journey, replayJourney]) assert.equal((await metric({ id, event: 'receipt' })).status, 204);
+  assert.deepEqual(await (await api('metrics')).json(), { days: 30, starts: 2, selections: 2, receipts: 1, medianMs: 13500 });
+  assert.deepEqual(await (await api('metrics&period=week')).json(), { days: 7, starts: 2, selections: 2, receipts: 1, medianMs: 13500 });
+  assert.deepEqual(await (await api('metrics&period=previous-week')).json(), { days: 7, starts: 0, selections: 0, receipts: 0, medianMs: null });
   const soniaBooking = await fetch(bookUrl, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() }, body: JSON.stringify({ ...data, staff: 'sonia' }) });
   assert.equal(soniaBooking.status, 201);
-  assert.equal((await soniaBooking.json()).receipt.staffName, 'سونیا');
+  const soniaReceipt = (await soniaBooking.json()).receipt;
+  assert.equal(soniaReceipt.staffName, 'سونیا');
+  const found = await api('search', { reference: '  ' + soniaReceipt.reference.toLowerCase() + '  ' });
+  assert.deepEqual((await found.json()).appointment, { reference: soniaReceipt.reference, staff: 'sonia', date: day, period: '10-12', status: 'CONFIRMED' });
   const soniaList = await (await api(`month&month=${month}&staff=sonia`)).json();
   assert.equal(soniaList.staff, 'sonia');
   assert.equal(soniaList.appointments.length, 1);
@@ -86,7 +124,9 @@ try {
   const soniaLogin = await api('login', { username: 'sonia', password });
   assert.equal(soniaLogin.status, 200); csrf = (await soniaLogin.json()).csrf;
   assert.equal((await (await api('status')).json()).username, 'sonia');
+  const cancelled = await api('search', { reference });
+  assert.deepEqual((await cancelled.json()).appointment, { reference, staff: 'tina', date: day, period: '12-14', status: 'CANCELLED' });
   assert.equal((await (await api(`month&month=${month}`)).json()).staff, 'sonia', 'A session defaults to its own calendar');
   assert.deepEqual((await (await fetch(`${bookUrl}?date=${day}&staff=sonia`)).json()).taken, ['10-12', '14-16']);
-  console.log('PASS admin HTTP: private reads, Origin/CSRF, login cookies, independent staff booking/closures, edit/version/cancel and logout');
+  console.log('PASS admin HTTP: session/CSRF, cross-calendar reference search, cancellation, private aggregate metrics and genuine-receipt conversion');
 } finally { child.kill(); await new Promise(resolve => child.once('exit', resolve)); await rm(root, { recursive: true, force: true }); }

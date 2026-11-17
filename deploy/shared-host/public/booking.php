@@ -33,6 +33,13 @@ try {
     if ($raw===false || strlen($raw)>8192) respond(413,['message'=>'حجم درخواست زیاد است.']);
     try { $body=json_decode($raw,true,32,JSON_THROW_ON_ERROR); } catch(JsonException $error) { respond(400,['message'=>'اطلاعات درخواست خوانده نشد.']); }
     $result=$store->reserve($_SERVER['HTTP_IDEMPOTENCY_KEY']??'',$body,$_SERVER['REMOTE_ADDR']??'unknown',$now);
+    if (!$result['repeated'] && isset($_SERVER['HTTP_X_BOOKING_MEASUREMENT'])) {
+        try {
+            require $runtime.'/BookingMetrics.php';
+            $journey = $_SERVER['HTTP_X_BOOKING_MEASUREMENT'];
+            if (BookingMetrics::validId($journey)) (new BookingMetrics($runtime.'/data/metrics.sqlite'))->issue($journey,$now->getTimestamp());
+        } catch (Throwable $error) { /* Measurement is optional after a successful booking. */ }
+    }
     respond($result['repeated']?200:201,['receipt'=>$result['receipt']]);
 } catch(BookingFailure $error) { respond($error->status,['code'=>$error->errorCode,'message'=>$error->getMessage()]+($error->errors?['errors'=>$error->errors]:[])); }
 catch(Throwable $error) { respond(503,['message'=>'ثبت نوبت فعلاً انجام نشد. دوباره تلاش کن یا با تینا تماس بگیر.']); }

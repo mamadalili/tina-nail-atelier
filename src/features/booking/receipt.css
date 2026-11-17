@@ -1,10 +1,12 @@
 .receipt-experience { max-width: 640px; margin-inline: auto; }
 .receipt-intro { text-align: center; margin-bottom: 24px; }
 .receipt-check { display: grid; place-items: center; width: 44px; height: 44px; margin: 0 auto 10px; border: 1px solid var(--green); border-radius: 50%; color: var(--green); }
+.receipt-check.is-cancelled { color: var(--red); border-color: var(--red); }
 .receipt-intro h3 { font-size: 1.6rem; font-weight: 600; }
 .receipt-intro p { margin-top: 4px; font-size: .87rem; color: var(--muted); }
 .appointment-ticket { background: var(--surface); border-radius: 14px; box-shadow: 0 12px 32px #233c3210; }
 .ticket-masthead { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 22px 28px; background: var(--green); color: var(--on-dark); border-radius: 14px 14px 0 0; }
+.ticket-cancelled .ticket-masthead { background: var(--red); }
 .ticket-wordmark { display: block; width: fit-content; font: 500 3.6rem/.85 var(--serif); }
 .ticket-wordmark > span { color: #f1b6c5; }
 .ticket-atelier { display: block; margin-top: 10px; font-size: .7rem; }
@@ -32,10 +34,20 @@
 .copy-status:not(:empty) { margin-top: 8px; font-size: .85rem; color: var(--green); }
 .receipt-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-top: 22px; }
 .receipt-actions .button { min-height: 48px; font-size: .86rem; }
-.receipt-actions a { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: .8rem; color: var(--green); text-decoration: underline; text-underline-offset: 4px; }
+.receipt-actions .ticket-calendar { gap: 8px; }
+.receipt-actions .ticket-print { border-color: var(--control-line); color: var(--green); }
+.receipt-actions .ticket-contact { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: .8rem; color: var(--green); text-decoration: underline; text-underline-offset: 4px; }
 .receipt-save-hint { margin-top: 12px; text-align: center; color: var(--muted); font-size: .75rem; }
 .preview-notice { margin-bottom: 24px; padding: 12px 16px; border: 1px solid var(--red); border-radius: 6px; color: var(--red); font-size: .85rem; text-align: center; }
 .receipt-preview-page { padding: 32px 12px 60px; }
+.receipt-navigation { display: flex; width: fit-content; max-width: 100%; gap: 4px; margin: 0 auto 20px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.receipt-navigation button { flex: 1 0 auto; padding: 6px 16px; min-height: 44px; border-radius: var(--radius); font-size: .86rem; }
+.receipt-navigation button[aria-pressed="true"] { color: var(--on-dark); background: var(--green); }
+.receipt-picker { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 14px; margin: 0 auto 18px; font-size: .85rem; }
+.receipt-picker select { max-width: 100%; min-height: 44px; padding: 5px 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--control-line); border-radius: var(--radius); font: .85rem ui-monospace, monospace; }
+.receipt-storage-note, .receipt-lookup { max-width: 640px; margin-inline: auto; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); text-align: center; }
+.receipt-storage-note { margin-bottom: 18px; font-size: .85rem; }
+.receipt-lookup > div { display: flex; justify-content: center; gap: 18px; }
 @media (max-width: 680px) {
   .receipt-intro { margin-bottom: 18px; }
   .receipt-intro h3 { font-size: 1.3rem; }
@@ -55,6 +67,8 @@
   .ticket-stub strong { font-size: .72rem; }
   .receipt-actions { margin-top: 16px; justify-content: center; }
   .receipt-actions .button { flex: 1 1 auto; }
+  .receipt-actions .ticket-contact { justify-content: center; flex: 1 0 100%; }
+  .receipt-picker select { font-size: 1rem; }
 }
 @page appointment { size: A5 portrait; margin: 12mm; }
 @media print {

@@ -6,7 +6,7 @@ Use PostgreSQL and apply migrations before enabling `BOOKING_ENABLED=true`. New 
 
 Migrations preserve old requests and backfill unique references. Existing duplicate confirmed slots must be resolved deliberately before the unique index can be created; the migration does not delete guest records. Historical pending requests are not silently confirmed.
 
-Use a correctly configured HTTPS `SITE_URL` in production. PostgreSQL and Redis remain private in the existing Compose architecture. The project has no public lookup endpoint for receipts or guest information. References appear in the POST receipt response and backend notifications.
+Use a correctly configured HTTPS `SITE_URL` in production. PostgreSQL and Redis remain private in the existing Compose architecture. A guest can reopen a receipt with a same-origin POST to `/api/receipt` using both the reference and the original request UUID. Only these credentials and the save time stay in browser storage. Reopening reads the current appointment from the database, including cancellations and reschedules.
 
 ## SMS patterns
 

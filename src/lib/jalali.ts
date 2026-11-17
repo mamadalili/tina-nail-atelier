@@ -15,11 +15,13 @@ export function shiftMonth(year: number, month: number, delta: number) {
   return { year: Math.floor(index / 12), month: index % 12 + 1 };
 }
 
-export function nextJalaliDay(key: string): string {
+export function addJalaliDays(key: string, days: number): string {
   const [year, month, day] = key.split('-').map(Number);
-  const { jy, jm, jd } = jalaali.d2j(jalaali.j2d(year, month, day) + 1);
+  const { jy, jm, jd } = jalaali.d2j(jalaali.j2d(year, month, day) + days);
   return dateKey(jy, jm, jd);
 }
+
+export function nextJalaliDay(key: string) { return addJalaliDays(key, 1); }
 
 export function monthCells(year: number, month: number): Array<number | null> {
   const first = jalaali.toGregorian(year, month, 1);
