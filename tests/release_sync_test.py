@@ -6,7 +6,7 @@ from pathlib import Path
 import stat
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from urllib.error import HTTPError
 import zipfile
 
@@ -166,6 +166,23 @@ class ReleaseSyncTests(unittest.TestCase):
             opener.return_value.open.return_value = Reply(b'{"enabled":true}')
             with self.assertRaises(ValueError):
                 sync.download(sync.SITE + '/tina-preview/api/booking.php?action=health', revision=SHA, store=True)
+
+    def test_domain_confirmation_is_independent_of_github_quota(self):
+        limited = Mock(side_effect=OSError('HTTP 403: rate limit exceeded'))
+        with patch.object(sync, 'verify_live') as verify:
+            self.assertTrue(sync.wait_for_domain(SHA, limited, timeout=0))
+        verify.assert_called_once_with(SHA)
+        limited.assert_not_called()
+
+    def test_delayed_domain_retries_after_ref_outage_and_preserves_domain_error(self):
+        limited = Mock(side_effect=OSError('HTTP 403: rate limit exceeded'))
+        with patch.object(sync, 'verify_live', side_effect=[ValueError('previous release'), None]), patch.object(sync.time, 'sleep'):
+            self.assertTrue(sync.wait_for_domain(SHA, limited))
+        limited.assert_called_once_with()
+        with patch.object(sync, 'verify_live', side_effect=ValueError('previous release')):
+            with self.assertRaisesRegex(ValueError, 'previous release'):
+                sync.wait_for_domain(SHA, limited, timeout=0)
+            self.assertFalse(sync.wait_for_domain(SHA, lambda: 'c' * 40, timeout=0))
 
 
 if __name__ == '__main__':

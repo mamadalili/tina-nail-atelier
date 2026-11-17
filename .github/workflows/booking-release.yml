@@ -146,21 +146,23 @@ jobs:
         with:
           persist-credentials: false
       - name: Wait for the hosting account to install the package
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: python
         run: |
-          import os, runpy, time
+          import os, runpy, subprocess
           installer = runpy.run_path('deploy/shared-host/runtime/sync_release.py')
           commit = os.environ['GITHUB_SHA']
-          end = time.monotonic() + 15 * 60
-          while True:
+          def latest_ref():
               try:
-                  if installer['main_commit']() != commit:
-                      print('A newer main revision now owns deployment. This revision was superseded.')
-                      break
-                  installer['verify_live'](commit)
-                  print('Confirmed the public site, administrator page and booking availability.')
-                  break
-              except (OSError, ValueError, KeyError) as exc:
-                  if time.monotonic() >= end:
-                      raise SystemExit('The tested ZIP is on GitHub. The domain did not confirm it: ' + str(exc))
-                  time.sleep(25)
+                  ref = subprocess.run(['gh', 'api', 'repos/' + os.environ['GITHUB_REPOSITORY'] + '/git/ref/heads/main',
+                                        '--jq', '.object.sha'], capture_output=True, text=True, timeout=15)
+              except subprocess.TimeoutExpired:
+                  return None
+              return ref.stdout.strip() if ref.returncode == 0 else None
+          try:
+              confirmed = installer['wait_for_domain'](commit, latest_ref)
+          except (OSError, ValueError, KeyError) as exc:
+              raise SystemExit('The tested ZIP is on GitHub. The domain did not confirm it: ' + str(exc))
+          print('Confirmed the public site, administrator page and booking availability.' if confirmed else
+                'A newer main revision now owns deployment. This revision was superseded.')

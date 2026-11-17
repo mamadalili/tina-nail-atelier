@@ -260,6 +260,30 @@ def verify_live(commit):
             time.sleep(2)
 
 
+def wait_for_domain(commit, latest_ref, timeout=15 * 60):
+    end = time.monotonic() + timeout
+    next_ref_check = 0
+    while True:
+        try:
+            verify_live(commit)
+            return True
+        except (OSError, ValueError, KeyError):
+            now = time.monotonic()
+            if now >= next_ref_check:
+                # A ref lookup can explain a mismatch, but must never hide the actual domain result.
+                next_ref_check = now + 90
+                try:
+                    latest = latest_ref()
+                except OSError:
+                    latest = None
+                if latest and re.fullmatch(r'[0-9a-f]{40}', latest) and latest != commit:
+                    return False
+            remaining = end - time.monotonic()
+            if remaining <= 0:
+                raise
+            time.sleep(min(25, remaining))
+
+
 def sync(home):
     state = state_directory(home)
     with (state / 'lock').open('a') as lock:
