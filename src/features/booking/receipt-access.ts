@@ -1,4 +1,5 @@
 import { receiptProofSchema, savedReceiptSchema, type ReceiptProof } from './receipt-model';
+import type { PeriodId } from '../../content/salon';
 
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '');
 const receiptUrl = `${basePath}/api/${process.env.NEXT_PUBLIC_BOOKING_ADAPTER === 'shared-host' ? 'receipt.php' : 'receipt'}`;
@@ -48,12 +49,20 @@ export function receiptStorageChanged(event: StorageEvent) {
   return event.key === null || event.key.startsWith(prefix);
 }
 
-export async function fetchBookingReceipt({ reference, requestKey }: ReceiptProof, signal: AbortSignal) {
+export type ReceiptChange = { action: 'cancel' } | { action: 'reschedule'; date: string; period: PeriodId };
+export class ReceiptFailure extends Error {
+  constructor(public readonly code: string) { super(code); }
+}
+
+export async function fetchBookingReceipt({ reference, requestKey }: ReceiptProof, signal: AbortSignal, change?: ReceiptChange & { version: number }) {
   const response = await fetch(receiptUrl, {
     method: 'POST', mode: 'same-origin', cache: 'no-store', signal,
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference, requestKey }),
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference, requestKey, ...change }),
   });
-  if (!response.ok) throw new Error('RECEIPT_UNAVAILABLE');
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ReceiptFailure(typeof body?.code === 'string' ? body.code : 'RECEIPT_UNAVAILABLE');
+  }
   const receipt = savedReceiptSchema.parse((await response.json()).receipt);
   if (receipt.reference !== reference) throw new Error('RECEIPT_MISMATCH');
   return receipt;

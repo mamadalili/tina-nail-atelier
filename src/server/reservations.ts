@@ -4,14 +4,21 @@ import type { PrismaClient } from '../generated/prisma/client';
 import { selectionErrors, validateRequest, validateSubmission } from '../features/booking/model';
 import { receiptFor, slotTimes } from '../features/booking/receipt-model';
 import { toGregorianDay } from '../lib/jalali';
+import { isStaffSlotOpen } from './staff-schedules';
 
 export class ReservationError extends Error {
   constructor(public status: number, public code: string, message: string, public errors?: Record<string, string>) { super(message); }
 }
 
+export function slotTaken() {
+  return new ReservationError(409, 'SLOT_TAKEN', 'این بازه در دسترس نیست؛ ساعت یا روز دیگری انتخاب کن.', { period: 'این بازه دیگر خالی نیست.' });
+}
+
 export async function reserveAppointment(db: PrismaClient, key: string, input: unknown, now = new Date()) {
   const previous = await db.appointmentRequest.findUnique({ where: { idempotencyKey: key } });
-  const validation = previous ? validateRequest(input, previous.jalaliDay) : validateSubmission(input, now);
+  // The immutable payload hash authenticates the original day even after the appointment moves.
+  const submittedDay = typeof input === 'object' && input !== null && 'date' in input && typeof input.date === 'string' ? input.date : undefined;
+  const validation = previous ? validateRequest(input, submittedDay) : validateSubmission(input, now);
   if (!validation.success) throw new ReservationError(422, 'INVALID_REQUEST', 'اطلاعات نوبت را بررسی کن.', validation.errors);
   const data = validation.data;
   const payloadHash = createHash('sha256').update(JSON.stringify(data)).digest('hex');
@@ -31,6 +38,7 @@ export async function reserveAppointment(db: PrismaClient, key: string, input: u
       if (repeated) return { receipt: replay(repeated), repeated: true };
       const recent = await tx.appointmentRequest.count({ where: { phone: data.phone, createdAt: { gt: new Date(now.getTime() - 3600000) } } });
       if (recent >= 3) throw new ReservationError(429, 'RATE_LIMITED', 'چند نوبت با این شماره ثبت شده؛ برای پیگیری با تینا تماس بگیر.');
+      if (!await isStaffSlotOpen(tx, data.staff, data.date, data.period)) throw slotTaken();
       const lateErrors = selectionErrors(data, new Date(Math.max(now.getTime(), Date.now())));
       if (Object.keys(lateErrors).length) throw new ReservationError(422, 'INVALID_REQUEST', 'روز و ساعت را دوباره بررسی کن.', lateErrors);
       const times = slotTimes(data.date, data.period);
@@ -50,7 +58,7 @@ export async function reserveAppointment(db: PrismaClient, key: string, input: u
       const repeated = await db.appointmentRequest.findUnique({ where: { idempotencyKey: key } });
       if (repeated) return { receipt: replay(repeated), repeated: true };
       const occupied = await db.appointmentRequest.findFirst({ where: { staff: data.staff ?? 'tina', jalaliDay: data.date, period: data.period, status: 'CONFIRMED' }, select: { id: true } });
-      if (occupied) throw new ReservationError(409, 'SLOT_TAKEN', 'این بازه همین حالا رزرو شد؛ ساعت یا روز دیگری انتخاب کن.', { period: 'این بازه دیگر خالی نیست.' });
+      if (occupied) throw slotTaken();
     }
     throw error;
   }

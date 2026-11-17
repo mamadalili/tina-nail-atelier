@@ -12,8 +12,9 @@ function respond(int $status, array $body): never {
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'HEAD') { http_response_code(204); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Allow: POST');
+    header('Allow: POST, HEAD');
     respond(405, ['message'=>'این روش درخواست مجاز نیست.']);
 }
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -38,9 +39,13 @@ try {
     if (!is_file($path)) throw new RuntimeException('STORAGE_UNAVAILABLE');
     require $runtime.'/BookingStore.php';
     $store = new BookingStore($path);
-    $receipt = $store->guestReceipt($body['reference'], $body['requestKey']);
+    $receipt = array_key_exists('action', $body)
+        ? $store->changeGuestReceipt($body)
+        : $store->guestReceipt($body['reference'], $body['requestKey']);
     if ($receipt === null) respond(404, $missing);
     respond(200, ['receipt'=>$receipt]);
+} catch (BookingFailure $error) {
+    respond($error->status, ['code'=>$error->errorCode, 'message'=>$error->getMessage()]);
 } catch (Throwable $error) {
     respond(503, ['message'=>'دریافت وضعیت نوبت فعلاً ممکن نیست. دوباره تلاش کن.']);
 }

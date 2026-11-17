@@ -30,6 +30,9 @@ migrationOk($updated['manicureType']==='gel','An unrelated edit preserves the re
 $replay=$store->reserve($key,$data,'local',$now);
 migrationOk($replay['receipt']['staff']==='sonia'&&$replay['receipt']['staffName']==='سونیا','Legacy replay follows an intentional reassignment');
 migrationOk($replay['receipt']['service']==='خدمات مانیکور'&&$replay['receipt']['treatment']==='ژلیش','An unrelated edit preserves the original receipt labels');
+$moved=$store->changeGuestReceipt(['reference'=>$reference,'requestKey'=>$key,'action'=>'reschedule','version'=>2,'date'=>'1405-08-21','period'=>'16-18'],$now);
+migrationOk($moved['staff']==='sonia'&&$moved['service']==='خدمات مانیکور'&&$moved['treatment']==='ژلیش'&&$moved['version']===3,'The original proof can move a migrated appointment without changing its artist or legacy labels');
+migrationOk($store->reserve($key,$data,'local',$now)['receipt']['date']==='1405-08-21','An old-format booking retry sees the guest’s new day');
 $db=new PDO('sqlite:'.$path);
 migrationOk($db->query('SELECT payload_hash FROM appointments')->fetchColumn()===$hash,'Original idempotency hash is preserved');
 unset($store,$db);foreach(glob($dir.'/*')as$file)unlink($file);rmdir($dir);

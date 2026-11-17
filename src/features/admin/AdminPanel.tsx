@@ -9,10 +9,10 @@ import { AdminCalendar } from './AdminCalendar';
 import { AppointmentDialog, type EditData } from './AppointmentDialog';
 import { BookingPerformance, ReferenceSearch, type AppointmentLocation } from './BookingManagement';
 import { PortfolioEditor } from './PortfolioEditor';
-import { daySlots, monthSchema, monthSummary, mutationRecovery, type Appointment, type CalendarData } from './model';
+import { StaffScheduleEditor } from './StaffScheduleEditor';
+import { ApiFailure, daySlots, monthSchema, monthSummary, mutationRecovery, type Appointment, type CalendarData } from './model';
 import './admin.css';
 
-class ApiFailure extends Error { constructor(message: string, public status: number, public code = '') { super(message); } }
 const endpoint = '/tina-administrator/api.php';
 
 export function AdminPanel() {
@@ -25,6 +25,7 @@ export function AdminPanel() {
   const [staff, setStaff] = useState<StaffId>('tina');
   const [username, setUsername] = useState<StaffId | ''>('');
   const [loading, setLoading] = useState(false);
+  const [monthStale, setMonthStale] = useState(false);
   const [pending, setPending] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [password, setPassword] = useState('');
@@ -40,7 +41,7 @@ export function AdminPanel() {
   const api = useCallback(async (action: string, body?: object, signal?: AbortSignal) => {
     const response = await fetch(`${endpoint}?action=${action}`, { method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf.current } : undefined, body: body ? JSON.stringify(body) : undefined, signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000) });
     const data = await response.json();
-    if (!response.ok) throw new ApiFailure(typeof data.message === 'string' ? data.message : 'درخواست انجام نشد؛ دوباره تلاش کن.', response.status, data.code);
+    if (!response.ok) throw new ApiFailure(typeof data.message === 'string' ? data.message : 'درخواست انجام نشد؛ دوباره تلاش کن.', response.status, data.code, data.conflicts);
     return data;
   }, []);
 
@@ -78,9 +79,13 @@ export function AdminPanel() {
   useEffect(() => {
     if (phase !== 'ready') return;
     const controller = new AbortController();setLoading(true);
-    api(`month&month=${month}&staff=${staff}`, undefined, controller.signal).then(data => { if (!controller.signal.aborted) setCalendar(monthSchema.parse(data)); }).catch(error => {
+    api(`month&month=${month}&staff=${staff}`, undefined, controller.signal).then(data => {
       if (controller.signal.aborted) return;
-      setCalendar(null);
+      setCalendar(monthSchema.parse(data));
+      setMonthStale(false);
+    }).catch(error => {
+      if (controller.signal.aborted) return;
+      setMonthStale(true);
       setFailed(true);setMessage(error instanceof ApiFailure ? error.message : 'فهرست نوبت‌ها دریافت نشد. دوباره تلاش کن.');
       if (error instanceof ApiFailure && error.status === 401) { setCalendar(null);setDialog(null);void loadStatus(); }
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -135,7 +140,7 @@ export function AdminPanel() {
 
   useEffect(() => {
     const target = requestedRow.current;
-    if (!target || !current || loading || target.date !== day || target.staff !== staff) return;
+    if (!target || !current || loading || monthStale || target.date !== day || target.staff !== staff) return;
     requestedRow.current = null;
     const row = document.getElementById('admin-row-' + target.reference);
     if (row) {
@@ -146,7 +151,7 @@ export function AdminPanel() {
       setFailed(true);
       setMessage('نوبت هنگام جست‌وجو تغییر کرد. کد پیگیری را دوباره جست‌وجو کن.');
     }
-  }, [current, day, loading, staff]);
+  }, [current, day, loading, monthStale, staff]);
 
   if (phase !== 'ready') return <main className="admin-login-shell">
     <section className="admin-login">
@@ -179,19 +184,26 @@ export function AdminPanel() {
     <div className="admin-staff-bar"><StaffSelector name="admin-staff" legend="تقویم کدام نفر؟" value={staff} disabled={pending || loading} onChange={value => { setStaff(value);setLoading(true);setMessage('');setDialog(null); }} /></div>
     <div className="admin-workspace"><aside><AdminCalendar year={view.year} month={view.month} day={day} today={today} summary={current ? monthSummary(current.appointments, current.blocks) : {}} onDay={value => { setDay(value);setMessage(''); }} onMonth={moveMonth} onToday={goToday} /><p className="admin-side-note">تقویم تینا و سونیا جداست. باز و بسته کردن ساعت، فقط روی فرد انتخاب‌شده اعمال می‌شود. هر نوبت دو ساعت است.</p></aside>
       <section className="admin-day-panel" aria-labelledby="admin-day-title" aria-busy={loading}><header className="admin-day-heading"><div><p>برنامهٔ {selectedStaff.name}{day === today ? ' · امروز' : ''}</p><h2 id="admin-day-title">{readableDay(day)}</h2></div><span>به وقت تهران</span></header>
-        {loading ? <div className="admin-loading" role="status">در حال دریافت نوبت‌های این ماه…</div> : !current ? <div className="admin-loading"><p>فهرست نوبت‌ها قابل نمایش نیست.</p><button className="admin-text-button" onClick={() => setRefresh(value => value + 1)}>دریافت دوباره</button></div> : <><div className="admin-slot-list">{slots.map(slot => <article key={slot.id} className={`admin-slot ${slot.kind}`}
+        {loading && !current ? <div className="admin-loading" role="status">در حال دریافت نوبت‌های این ماه…</div> : !current ? <div className="admin-loading"><p>فهرست نوبت‌ها قابل نمایش نیست.</p><button className="admin-text-button" onClick={() => setRefresh(value => value + 1)}>دریافت دوباره</button></div> : <><div className="admin-slot-list">{slots.map(slot => <article key={slot.id} className={`admin-slot ${slot.kind}`}
             id={slot.appointment ? `admin-row-${slot.appointment.reference}` : undefined} tabIndex={slot.appointment ? -1 : undefined}
             data-found={slot.appointment?.reference === highlighted || undefined}><div className="admin-slot-time"><strong>{slot.label}</strong><span>{slot.kind === 'appointment' ? 'نوبت ثبت‌شده' : slot.kind === 'blocked' ? 'بسته' : isUpcomingPeriod(day, slot.id) ? 'آزاد' : 'زمان گذشته'}</span></div>{slot.appointment ? <div className="admin-guest"><div className="admin-guest-heading"><h3>{slot.appointment.name}</h3><a dir="ltr" href={`tel:${slot.appointment.phone}`}>{faNumber(slot.appointment.phone)}</a></div><p>{services.find(item => item.id === slot.appointment!.service)?.name}{slot.appointment.manicureType ? ` · ${manicureOptions.find(item => item.id === slot.appointment!.manicureType)?.label}` : ''}</p>
             <p className="admin-row-reference">کد پیگیری <bdi dir="ltr">{slot.appointment.reference}</bdi></p>
-            {slot.appointment.note && <p className="admin-guest-note">{slot.appointment.note}</p>}<div className="admin-slot-actions"><button className="admin-button secondary" disabled={pending} onClick={() => open(slot.appointment!, 'edit')}>ویرایش و تغییر زمان</button><button className="admin-text-button danger-text" disabled={pending} onClick={() => open(slot.appointment!, 'cancel')}>لغو نوبت</button></div></div> : <div className="admin-empty-slot"><p>{slot.kind === 'blocked' ? 'این ساعت در سایت قابل رزرو نیست.' : 'نوبتی برای این ساعت ثبت نشده است.'}</p><button className="admin-button secondary" disabled={pending || (slot.kind !== 'blocked' && !isUpcomingPeriod(day, slot.id))} onClick={() => void mutate('block', { date: day, period: slot.id, blocked: slot.kind !== 'blocked' }, slot.kind === 'blocked' ? 'ساعت دوباره قابل رزرو شد.' : 'ساعت بسته شد؛ در سایت قابل رزرو نیست.')}>{slot.kind === 'blocked' ? 'باز کردن این ساعت' : 'بستن این ساعت'}</button></div>}</article>)}</div>
+            {slot.appointment.note && <p className="admin-guest-note">{slot.appointment.note}</p>}<div className="admin-slot-actions"><button className="admin-button secondary" disabled={pending || loading || monthStale} onClick={() => open(slot.appointment!, 'edit')}>ویرایش و تغییر زمان</button><button className="admin-text-button danger-text" disabled={pending || loading || monthStale} onClick={() => open(slot.appointment!, 'cancel')}>لغو نوبت</button></div></div> : <div className="admin-empty-slot">{slot.source === 'schedule' ? <>
+              <p>این ساعت طبق برنامهٔ هفتگی یا مرخصی {selectedStaff.name} بسته است.</p><a href="#admin-schedule">دیدن برنامهٔ کاری</a>
+            </> : <>
+              <p>{slot.kind === 'blocked' ? 'این ساعت به‌صورت دستی بسته شده است.' : 'نوبتی برای این ساعت ثبت نشده است.'}</p>
+              <button className="admin-button secondary" disabled={pending || loading || monthStale || (slot.kind !== 'blocked' && !isUpcomingPeriod(day, slot.id))}
+                onClick={() => void mutate('block', { date: day, period: slot.id, blocked: slot.kind !== 'blocked' }, slot.kind === 'blocked' ? 'بسته‌بودن دستی این ساعت برداشته شد.' : 'این ساعت به‌صورت دستی بسته شد.')}>{slot.kind === 'blocked' ? 'باز کردن این ساعت' : 'بستن این ساعت'}</button>
+            </>}</div>}</article>)}</div>
           {cancelled.length > 0 && <details className="admin-cancelled"><summary>نوبت‌های لغوشدهٔ این روز ({faNumber(cancelled.length)})</summary>
             {cancelled.map(item => <div key={item.reference} id={`admin-row-${item.reference}`} tabIndex={-1} data-found={item.reference === highlighted || undefined}>
               <div><strong>{item.name}</strong><p className="admin-row-reference">کد پیگیری <bdi dir="ltr">{item.reference}</bdi></p></div>
               <span>{faNumber(item.period.replace('-', ' تا '))} · لغوشده</span></div>)}</details>}</>}
       </section></div>
+    <StaffScheduleEditor key={'schedule-' + staff} staff={staff} today={today} request={managementRequest} onSaved={() => setRefresh(value => value + 1)} onBooking={showFound} />
     <BookingPerformance request={managementRequest} refresh={refresh} />
     {username && <PortfolioEditor key={username} staff={username} request={managementRequest} />}
     <p className="admin-footer-note">پیامک و اعلان خودکار فعلاً خاموش است. برای هماهنگی تغییر نوبت، با مهمان تماس بگیر.</p>
-    </main>{dialog && <AppointmentDialog key={`${dialog.mode}-${dialog.appointment.reference}`} {...dialog} pending={pending} error={dialogError} onClose={() => setDialog(null)} onSave={(data: EditData) => void mutate('update', { reference: dialog.appointment.reference, version: dialog.appointment.version, data }, 'تغییرات نوبت ذخیره شد.', data.date, data.staff)} onCancel={() => void mutate('cancel', { reference: dialog.appointment.reference, version: dialog.appointment.version }, 'نوبت لغو شد و ساعت آن آزاد است.')} />}
+    </main>{dialog && <AppointmentDialog key={`${dialog.mode}-${dialog.appointment.reference}`} {...dialog} pending={pending} error={dialogError} onClose={() => setDialog(null)} onSave={(data: EditData) => void mutate('update', { reference: dialog.appointment.reference, version: dialog.appointment.version, data }, 'تغییرات نوبت ذخیره شد.', data.date, data.staff)} onCancel={() => void mutate('cancel', { reference: dialog.appointment.reference, version: dialog.appointment.version }, 'نوبت لغو شد.')} />}
   </div>;
 }

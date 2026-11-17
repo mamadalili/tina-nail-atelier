@@ -11,6 +11,7 @@ function respond(int $status,array $body): never { http_response_code($status);e
 try {
     $runtime=dirname(__DIR__,3).'/tina-booking-runtime';
     require $runtime.'/BookingStore.php';
+    header('X-Tina-Store-Source: '.BookingStore::RELEASE_SOURCE);
     if (!is_dir($runtime.'/data') && !mkdir($runtime.'/data',0700,true) && !is_dir($runtime.'/data')) throw new RuntimeException('STORAGE_UNAVAILABLE');
     $store=new BookingStore($runtime.'/data/appointments.sqlite');
     $now=new DateTimeImmutable('now',new DateTimeZone('Asia/Tehran'));

@@ -2,6 +2,7 @@ import { bookedServiceName, receiptFor, type ReceiptRecord } from '../features/b
 import { readableDay } from '../lib/jalali';
 import { normalizeMobile, requestMessage, type BookingRequest } from '../features/booking/model';
 import { periods } from '../content/salon';
+import type { PrismaClient } from '../generated/prisma/client';
 
 type Config = Record<string, string | undefined>;
 type NotificationEvent = { channel: string; request: ReceiptRecord & { phone: string; note: string } };
@@ -50,4 +51,26 @@ export async function sendNotification(event: NotificationEvent, env: Config = p
     return body.messages[0].id;
   }
   throw new Error('UNSUPPORTED_CHANNEL');
+}
+
+export async function deliverOutboxEvent(db: PrismaClient, eventId: string, send = sendNotification) {
+  await db.$transaction(async tx => {
+    // Keep a provider call within the transaction budget even when a booking is busy.
+    await tx.$executeRaw`SET LOCAL lock_timeout = '5s'`;
+    // Lock the appointment before its event, in the same order as receipt edits.
+    // Shared appointment locks let independent guest and manager notifications run concurrently.
+    const [locked] = await tx.$queryRaw<{ id: string }[]>`
+      SELECT a.id FROM "AppointmentRequest" a JOIN "OutboxEvent" e ON e."requestId" = a.id
+      WHERE e.id = ${eventId}::uuid AND e."sentAt" IS NULL AND e."skippedAt" IS NULL FOR SHARE OF a`;
+    if (!locked) return;
+    await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${eventId}::uuid FOR UPDATE`;
+    const event = await tx.outboxEvent.findUnique({ where: { id: eventId }, include: { request: true } });
+    if (!event || event.sentAt || event.skippedAt) return;
+    if (event.kind === 'CONFIRMED' && event.request.status !== 'CONFIRMED') {
+      await tx.outboxEvent.update({ where: { id: event.id }, data: { skippedAt: new Date() } });
+      return;
+    }
+    const providerMessageId = await send(event);
+    await tx.outboxEvent.update({ where: { id: event.id }, data: { sentAt: new Date(), providerMessageId } });
+  }, { timeout: 40000 });
 }

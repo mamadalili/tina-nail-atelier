@@ -22,7 +22,21 @@ Day availability returns the requested date and occupied periods. The booking fo
 
 The packager writes current ZIP timestamps. A fixed 1980 timestamp left the server serving stale cached HTML even though the new file was verified in File Manager; use a refreshed archive when replacing files. Do not overwrite guest storage while updating static assets.
 
-The static HTML refreshes its calendar in the browser. Only past dates and started/taken periods are disabled. The server revalidates every final submission. For bookings made with this release, the same browser can reopen the current receipt with its locally saved proof. A guest can export a confirmed appointment as an iCalendar event.
+The calendar refreshes its availability in the browser. The server checks staff working hours, leave, individual closures and existing bookings again when it saves a reservation or move. A guest can reopen the receipt in the same browser, move an upcoming appointment with the same artist, cancel it, or export a confirmed appointment as an iCalendar event. The receipt reference and original private request key authorize a change. The saved version prevents an old tab from overwriting a newer decision. A move keeps the original slot when the new one cannot be confirmed.
+
+## Publishing from GitHub
+
+The **Booking release** workflow tests the Node and PHP backends, builds both site exports and exercises the actual ZIP. It publishes the tested file as `tina-salon.zip` under the tag `booking-<full main commit>`. The package and live-site confirmation are separate jobs. The latter checks the full commit on the domain, both page versions, the booking service and the availability response.
+
+On the cPanel account, add one **Cron Jobs** entry at `*/5 * * * *`. After extracting a release into Home, the command is:
+
+```sh
+/usr/bin/python3 "$HOME/tina-booking-runtime/sync_release.py"
+```
+
+The release notes also provide a one-time setup command for an existing installation that does not yet contain the updater. That command pins the initial script to the release commit and verifies its SHA-256. Both forms use the public GitHub repository over HTTPS. The hosting account runs the script from its private runtime directory; GitHub needs no hosting password.
+
+On each update, the installer compares the current main commit, the full commit in the package, the release asset digest, and the SHA-256 recorded by a successful main workflow job. A private lock serializes installations. Existing hashed assets stay available for open browser tabs. The live check verifies the deployed PHP APIs and storage code as well as the two page versions. A failed domain check restores the previous application files and an interrupted installation recovers on the next run. The installer never copies or restores booking databases, photos in SQLite, or account credentials. Keep the normal hosting backups for those records.
 
 ## Verification commands
 

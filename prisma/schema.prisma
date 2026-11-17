@@ -29,6 +29,7 @@ model AppointmentRequest {
   period         String        @db.VarChar(20)
   note           String        @default("") @db.VarChar(500)
   status         RequestStatus @default(PENDING)
+  version        Int           @default(1)
   consentAt      DateTime      @default(now())
   startsAt       DateTime?     @db.Timestamptz(3)
   endsAt         DateTime?     @db.Timestamptz(3)
@@ -38,6 +39,12 @@ model AppointmentRequest {
 
   @@index([createdAt])
   @@index([status, preferredDay])
+}
+
+model StaffSchedule {
+  staff   String   @id @db.VarChar(20)
+  week    Json
+  daysOff String[] @default([])
 }
 
 model OutboxEvent {

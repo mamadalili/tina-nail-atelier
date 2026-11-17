@@ -1,16 +1,17 @@
 import { receiptProofSchema } from '@/features/booking/receipt-model';
 import { getDb } from '@/server/db';
-import { findGuestReceipt } from '@/server/guest-receipts';
+import { changeGuestReceipt, findGuestReceipt } from '@/server/guest-receipts';
 import { isAllowedOrigin } from '@/server/request-origin';
 import { readBoundedJson } from '@/server/read-bounded-json';
+import { ReservationError } from '@/server/reservations';
 
 export const runtime = 'nodejs';
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'X-Robots-Tag': 'noindex, nofollow' };
 const notFound = 'این رسید در دسترس نیست.';
 const unavailable = 'دریافت وضعیت نوبت فعلاً ممکن نیست. دوباره تلاش کن.';
 
-function error(status: number, message: string) {
-  return Response.json({ message }, { status, headers });
+function error(status: number, message: string, code?: string) {
+  return Response.json({ message, ...(code && { code }) }, { status, headers });
 }
 
 export async function POST(request: Request) {
@@ -24,7 +25,12 @@ export async function POST(request: Request) {
   if (!proof.success) return error(404, notFound);
   if (!process.env.DATABASE_URL) return error(503, unavailable);
   try {
-    const receipt = await findGuestReceipt(getDb(), proof.data);
+    const receipt = typeof body.data === 'object' && body.data !== null && 'action' in body.data
+      ? await changeGuestReceipt(getDb(), proof.data, body.data)
+      : await findGuestReceipt(getDb(), proof.data);
     return receipt ? Response.json({ receipt }, { headers }) : error(404, notFound);
-  } catch { return error(503, unavailable); }
+  } catch (err) {
+    if (err instanceof ReservationError) return error(err.status, err.message, err.code);
+    return error(503, unavailable);
+  }
 }

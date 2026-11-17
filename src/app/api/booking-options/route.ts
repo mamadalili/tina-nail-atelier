@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { staffMembers, periods } from '@/content/salon';
+import { staffMembers } from '@/content/salon';
 import { bookingWindow } from '@/features/booking/booking-options';
 import { getDb } from '@/server/db';
+import { unavailableSlots } from '@/server/staff-schedules';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,14 +15,7 @@ export async function GET() {
   try {
     const now = new Date();
     const { today, through } = bookingWindow(now);
-    const booked = await getDb().appointmentRequest.findMany({
-      where: {
-        status: 'CONFIRMED', jalaliDay: { gte: today, lte: through },
-        staff: { in: staffMembers.map(person => person.id) }, period: { in: periods.map(period => period.id) },
-      },
-      select: { staff: true, jalaliDay: true, period: true },
-    });
-    const taken = booked.map(({ staff, jalaliDay: date, period }) => ({ staff, date, period }));
+    const taken = await unavailableSlots(getDb(), today, through, staffMembers.map(person => person.id));
     return NextResponse.json({ asOf: now.toISOString(), taken }, { headers });
   } catch {
     return NextResponse.json({ message: 'دریافت وقت‌های آزاد انجام نشد.' }, { status: 503, headers });

@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { Queue, Worker } from 'bullmq';
 import { getDb } from './db';
-import { configuredChannels, sendNotification } from './notifications';
+import { configuredChannels, deliverOutboxEvent } from './notifications';
 
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl || !process.env.DATABASE_URL) {
@@ -13,16 +13,7 @@ const connection = { host: redis.hostname, port: Number(redis.port || 6379), pas
 const queue = new Queue('tina-notifications', { connection });
 const db = getDb();
 
-const worker = new Worker('tina-notifications', async job => {
-  const event = await db.outboxEvent.findUnique({ where: { id: job.data.eventId }, include: { request: true } });
-  if (!event || event.sentAt || event.skippedAt) return;
-  if (event.kind === 'CONFIRMED' && event.request.status !== 'CONFIRMED') {
-    await db.outboxEvent.update({ where: { id: event.id }, data: { skippedAt: new Date() } });
-    return;
-  }
-  const providerMessageId = await sendNotification(event);
-  await db.outboxEvent.update({ where: { id: event.id }, data: { sentAt: new Date(), providerMessageId } });
-}, { connection, concurrency: 2 });
+const worker = new Worker('tina-notifications', job => deliverOutboxEvent(db, job.data.eventId), { connection, concurrency: 2 });
 
 worker.on('failed', (job) => {
   if (!job) return;

@@ -1,0 +1,165 @@
+name: Booking release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: booking-release-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  test-and-package:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    outputs:
+      digest: ${{ steps.package.outputs.digest }}
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: local-test
+          POSTGRES_DB: salon_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 4s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres:local-test@127.0.0.1:5432/salon_test
+      BOOKING_ENABLED: 'true'
+      SITE_URL: http://127.0.0.1:18234
+      RUN_DB_INTEGRATION: 'true'
+      PHP_BIN: /usr/bin/php8.3
+      NEXT_TELEMETRY_DISABLED: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.11.1
+          cache: npm
+      - name: Install project and test runtimes
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y php8.3-cli php8.3-sqlite3 php8.3-gd
+          npm ci
+          npm install --prefix "$RUNNER_TEMP/salon-browser" --ignore-scripts --no-audit --no-fund playwright-core@1.58.1
+      - name: Check the application against PostgreSQL and SQLite
+        run: |
+          npm run db:migrate
+          npm run typecheck
+          npm test
+          for suite in auth booking admin staff-migration staff options receipt metrics guest-changes schedule change-races; do
+            "$PHP_BIN" "tests/shared-host-$suite.php"
+          done
+          node node_modules/tsx/dist/cli.mjs tests/shared-host-admin-http.ts
+          node node_modules/tsx/dist/cli.mjs tests/shared-host-portfolio-http.ts
+          python3 -B tests/release_sync_test.py
+      - name: Build and exercise the exact installation ZIP
+        id: package
+        run: |
+          node scripts/build-shared-host.mjs
+          python3 scripts/package-shared-host.py --versioned
+          archive="artifacts/tina-$(git rev-parse --short HEAD).zip"
+          export PLAYWRIGHT_MODULE="$RUNNER_TEMP/salon-browser/node_modules/playwright-core"
+          export CHROMIUM_EXECUTABLE="$(command -v google-chrome)"
+          python3 scripts/smoke-shared-release.py "$archive" --browser
+          cp "$archive" "$RUNNER_TEMP/tina-salon.zip"
+          python3 scripts/hosting-release-notes.py "$archive" > "$RUNNER_TEMP/hosting-notes.md"
+          digest="$(sha256sum "$archive" | cut -d' ' -f1)"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-salon-package
+          path: |
+            ${{ runner.temp }}/tina-salon.zip
+            ${{ runner.temp }}/hosting-notes.md
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-package:
+    name: Publish tested ZIP ${{ needs.test-and-package.outputs.digest }}
+    needs: test-and-package
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: tested-salon-package
+      - name: Publish this main revision
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED_DIGEST: ${{ needs.test-and-package.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" != "$GITHUB_SHA" ]]; then
+            echo "A newer main revision is queued."
+            exit 0
+          fi
+          tag="booking-$GITHUB_SHA"
+          echo "$TESTED_DIGEST  tina-salon.zip" | sha256sum --check --status
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Tina booking · ${GITHUB_SHA:0:7}" --notes-file hosting-notes.md tina-salon.zip
+          else
+            existing="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '.assets[] | select(.name=="tina-salon.zip") | .digest')"
+            if [[ "$existing" != "sha256:$TESTED_DIGEST" ]]; then
+              if [[ "$existing" =~ ^sha256:[0-9a-f]{64}$ ]] && python3 -c 'import runpy,sys; sys.exit(0 if runpy.run_path("deploy/shared-host/runtime/sync_release.py")["ci_verified_asset"](sys.argv[1], sys.argv[2]) else 1)' "$GITHUB_SHA" "${existing#sha256:}"; then
+                echo 'An independently tested package for this revision is already published.'
+                echo 'published=true' >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              gh release upload "$tag" tina-salon.zip --repo "$GITHUB_REPOSITORY" --clobber
+            fi
+          fi
+          if [[ "$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" == true ]]; then
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+          fi
+          published="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '.assets[] | select(.name=="tina-salon.zip") | .digest')"
+          [[ "$published" == "sha256:$TESTED_DIGEST" ]]
+          echo 'published=true' >> "$GITHUB_OUTPUT"
+
+  verify-domain:
+    name: Confirm version and booking availability on the domain
+    if: needs.publish-package.outputs.published == 'true'
+    needs: publish-package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Wait for the hosting account to install the package
+        shell: python
+        run: |
+          import os, runpy, time
+          installer = runpy.run_path('deploy/shared-host/runtime/sync_release.py')
+          commit = os.environ['GITHUB_SHA']
+          end = time.monotonic() + 15 * 60
+          while True:
+              try:
+                  if installer['main_commit']() != commit:
+                      print('A newer main revision now owns deployment. This revision was superseded.')
+                      break
+                  installer['verify_live'](commit)
+                  print('Confirmed the public site, administrator page and booking availability.')
+                  break
+              except (OSError, ValueError, KeyError) as exc:
+                  if time.monotonic() >= end:
+                      raise SystemExit('The tested ZIP is on GitHub. The domain did not confirm it: ' + str(exc))
+                  time.sleep(25)

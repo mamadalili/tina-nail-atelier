@@ -8,10 +8,29 @@ export const appointmentSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), period: z.enum(periods.map(item => item.id)), note: z.string(), issuedAt: z.string(), updatedAt: z.string().nullable(),
   staff: z.enum(staffMembers.map(item => item.id)).default('tina'),
 });
-export const monthSchema = z.object({ month: z.string(), staff: z.enum(staffMembers.map(item => item.id)).default('tina'), appointments: z.array(appointmentSchema), blocks: z.array(z.object({ date: z.string(), period: z.string(), staff: z.enum(staffMembers.map(item => item.id)).optional() })) });
+const blockSchema = z.object({
+  date: z.string(), period: z.string(), staff: z.enum(staffMembers.map(item => item.id)).optional(),
+  source: z.enum(['manual', 'schedule']).optional(),
+});
+export const monthSchema = z.object({ month: z.string(), staff: z.enum(staffMembers.map(item => item.id)).default('tina'), appointments: z.array(appointmentSchema), blocks: z.array(blockSchema) });
 export type Appointment = z.infer<typeof appointmentSchema>;
 export type CalendarData = z.infer<typeof monthSchema>;
 export type SlotBlock = CalendarData['blocks'][number];
+export const scheduleSchema = z.object({
+  staff: z.enum(staffMembers.map(item => item.id)), version: z.number().int().positive(),
+  week: z.array(z.array(appointmentSchema.shape.period).max(periods.length)).length(7), daysOff: z.array(appointmentSchema.shape.date),
+});
+export type StaffSchedule = z.infer<typeof scheduleSchema>;
+const conflictsSchema = z.array(appointmentSchema.pick({ reference: true, date: true, period: true }));
+export type ScheduleConflict = z.infer<typeof conflictsSchema>[number];
+
+export class ApiFailure extends Error {
+  readonly conflicts: ScheduleConflict[];
+  constructor(message: string, public status: number, public code = '', conflicts?: unknown) {
+    super(message);
+    this.conflicts = conflictsSchema.safeParse(conflicts).data ?? [];
+  }
+}
 
 export function mutationRecovery(status?: number, code = '') {
   return { closeDialog: status === undefined || code === 'STALE_BOOKING' || code === 'BOOKING_CANCELLED', refreshCalendar: status === undefined || status === 409 };
@@ -20,8 +39,8 @@ export function mutationRecovery(status?: number, code = '') {
 export function daySlots(day: string, appointments: ReadonlyArray<Appointment>, blocks: ReadonlyArray<SlotBlock>) {
   return periods.map(period => {
     const appointment = appointments.find(item => item.date === day && item.period === period.id && item.status === 'CONFIRMED');
-    const blocked = blocks.some(item => item.date === day && item.period === period.id);
-    return { ...period, kind: appointment ? 'appointment' as const : blocked ? 'blocked' as const : 'free' as const, appointment };
+    const block = blocks.find(item => item.date === day && item.period === period.id);
+    return { ...period, kind: appointment ? 'appointment' as const : block ? 'blocked' as const : 'free' as const, appointment, source: block && (block.source ?? 'manual') };
   });
 }
 

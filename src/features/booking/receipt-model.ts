@@ -17,6 +17,7 @@ const receiptFields = z.object({
   startsAt: z.iso.datetime(),
   endsAt: z.iso.datetime(),
   issuedAt: z.iso.datetime(),
+  version: z.int().positive().optional(),
   staff: z.enum(staffMembers.map(item => item.id)).default('tina'),
 });
 
@@ -44,7 +45,11 @@ export function slotTimes(day: string, periodId: string) {
   return { startsAt, endsAt: new Date(startsAt.getTime() + 2 * 3600000) };
 }
 
-export type ReceiptRecord = { reference: string; status: string; name: string; service: string; receiptServiceName: string | null; manicureType: string | null; jalaliDay: string; period: string; createdAt: Date; staff?: string };
+export type ReceiptRecord = {
+  reference: string; status: string; name: string; service: string; receiptServiceName: string | null;
+  manicureType: string | null; jalaliDay: string; period: string; createdAt: Date; staff?: string;
+  startsAt?: Date | null; endsAt?: Date | null; version?: number;
+};
 
 const originalServiceNames = { manicure: 'خدمات مانیکور', pedicure: 'خدمات پدیکور' };
 
@@ -55,11 +60,12 @@ export function bookedServiceName(record: Pick<ReceiptRecord, 'service' | 'recei
 }
 
 function receiptFieldsFor(record: ReceiptRecord) {
-  const slot = slotTimes(record.jalaliDay, record.period);
+  const slot = record.startsAt && record.endsAt ? { startsAt: record.startsAt, endsAt: record.endsAt } : slotTimes(record.jalaliDay, record.period);
   return {
     reference: record.reference, status: record.status, name: record.name, service: bookedServiceName(record),
     treatment: record.service === 'manicure' ? manicureOptions.find(item => item.id === record.manicureType)?.label ?? '' : '',
     date: record.jalaliDay, period: record.period, startsAt: slot.startsAt.toISOString(), endsAt: slot.endsAt.toISOString(), issuedAt: record.createdAt.toISOString(), staff: record.staff ?? 'tina',
+    ...(record.version !== undefined && { version: record.version }),
   };
 }
 

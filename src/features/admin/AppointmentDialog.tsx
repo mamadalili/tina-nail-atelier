@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { periods, services, staffMembers } from '@/content/salon';
-import { faNumber, monthCells, months, readableDay, todayInTehran } from '@/lib/jalali';
-import { validDateChange, type Appointment } from './model';
+import { readableDay, todayInTehran } from '@/lib/jalali';
+import type { Appointment } from './model';
+import { AdminDateFields } from './AdminDateFields';
 
 type EditableFields = Pick<Appointment, 'name' | 'phone' | 'service' | 'date' | 'period' | 'note' | 'staff'>;
 export type EditData = EditableFields & Pick<Appointment, 'manicureType'> & { consent: true };
@@ -15,7 +16,7 @@ export function AppointmentDialog({ appointment, mode, pending, error, onClose, 
   const ref = useRef<HTMLDialogElement>(null);
   const [data, setData] = useState<EditableFields>({ name: appointment.name, phone: appointment.phone, service: appointment.service, date: appointment.date, period: appointment.period, note: appointment.note, staff: appointment.staff });
   useEffect(() => { const dialog = ref.current!; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
-  const [year, month, day] = data.date.split('-').map(Number);
+  const year = Number(data.date.slice(0, 4));
   const currentYear = Number(todayInTehran().slice(0, 4));
   const years = [...new Set([year, Number(appointment.date.slice(0, 4)), currentYear, currentYear + 1])].sort((a, b) => a - b);
   function change<K extends keyof EditableFields>(key: K, value: EditableFields[K]) {
@@ -35,7 +36,7 @@ export function AppointmentDialog({ appointment, mode, pending, error, onClose, 
         <label>وقت با<select value={data.staff} onChange={event => change('staff', event.target.value as EditData['staff'])}>{staffMembers.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <div className="admin-field-pair"><label>نام و نام خانوادگی<input value={data.name} maxLength={80} required onChange={event => change('name', event.target.value)} autoComplete="off" /></label><label>شمارهٔ موبایل<input value={data.phone} type="tel" dir="ltr" required maxLength={20} onChange={event => change('phone', event.target.value)} autoComplete="off" /></label></div>
         <label>خدمت<select value={data.service} onChange={event => change('service', event.target.value as EditData['service'])}>{services.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <fieldset className="admin-date-fields"><legend>روز نوبت، به تاریخ شمسی</legend><label>روز<select value={day} onChange={event => change('date', validDateChange(data.date, 'day', Number(event.target.value)))}>{monthCells(year, month).filter((value): value is number => value !== null).map(value => <option key={value} value={value}>{faNumber(value)}</option>)}</select></label><label>ماه<select value={month} onChange={event => change('date', validDateChange(data.date, 'month', Number(event.target.value)))}>{months.map((value, i) => <option key={value} value={i + 1}>{value}</option>)}</select></label><label>سال<select value={year} onChange={event => change('date', validDateChange(data.date, 'year', Number(event.target.value)))}>{years.map(value => <option key={value} value={value}>{faNumber(value)}</option>)}</select></label></fieldset>
+        <AdminDateFields title="روز نوبت، به تاریخ شمسی" date={data.date} years={years} onChange={value => change('date', value)} />
         <label>ساعت نوبت<select value={data.period} onChange={event => change('period', event.target.value as EditData['period'])}>{periods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
         <label>یادداشت<textarea value={data.note} rows={3} maxLength={500} onChange={event => change('note', event.target.value)} /></label><p className="admin-help">اگر ساعت جدید رزرو یا بسته باشد، تغییر ذخیره نمی‌شود. پیامک خودکار ارسال نمی‌شود.</p>
       </fieldset>}

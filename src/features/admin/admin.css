@@ -23,3 +23,26 @@
 .admin-performance dl{margin:18px 0 0;display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .admin-performance dl div{border-top:1px solid var(--admin-line);padding-top:9px}.admin-performance dd{margin:4px 0 0;font-size:19px;font-weight:700}
 @media(max-width:500px){.admin-reference-search,.admin-performance{padding:15px}.admin-search-controls{flex-wrap:wrap}.admin-search-controls input{flex:1 1 165px}.admin-search-controls button{flex:1 1 auto}.admin-performance dl{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.admin-performance dd{font-size:16px}}
+
+.admin-schedule { margin-top: 28px; padding: 20px; border: 1px solid var(--admin-line); border-radius: 12px; background: var(--admin-paper); scroll-margin-block: 16px; }
+.admin-schedule h2 { font-size: 20px; }
+.schedule-fields { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(260px, .8fr); gap: 24px 36px; align-items: start; margin-block: 16px 20px; }
+.schedule-week { border-collapse: collapse; width: 100%; text-align: center; font-size: 14px; }
+.schedule-week caption { text-align: start; font-weight: 700; padding-bottom: 8px; }
+.schedule-week th, .schedule-week td { border-bottom: 1px solid var(--admin-line); }
+.schedule-week th { padding: 5px 2px; white-space: nowrap; }
+.schedule-week th:first-child { text-align: start; }
+.schedule-week thead { font-size: 13px; color: var(--admin-muted); }
+.schedule-week label { min-height: 44px; display: grid; place-items: center; cursor: pointer; }
+.schedule-week input { inline-size: 20px; block-size: 20px; min-height: 0; padding: 0; margin: 0; accent-color: var(--admin-green); cursor: pointer; }
+.schedule-leave h3 { font-size: 16px; }
+.schedule-leave > p { color: var(--admin-muted); font-size: 13px; margin-top: 6px; }
+.schedule-leave .admin-date-fields { margin-block: 14px; }
+.schedule-leave ul, .admin-schedule .admin-feedback ul { padding: 0; margin: 12px 0 0; list-style: none; }
+.schedule-leave li { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--admin-line); font-size: 14px; }
+.admin-schedule .admin-feedback { margin: 14px 0 0; }
+.admin-schedule .admin-feedback li + li { border-top: 1px solid var(--admin-line); }
+.admin-schedule .admin-feedback button { text-align: start; padding-inline: 0; }
+.admin-empty-slot a { font-size: 13px; padding-block: 11px; }
+@media (max-width: 760px) { .schedule-fields { grid-template-columns: minmax(0, 1fr); } .admin-schedule { padding: 16px; } .schedule-leave { border-top: 1px solid var(--admin-line); padding-top: 16px; } }
+@media (max-width: 390px) { .schedule-week, .schedule-week thead { font-size: 12px; } .admin-schedule { padding-inline: 12px; } }

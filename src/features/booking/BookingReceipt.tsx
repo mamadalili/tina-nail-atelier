@@ -7,6 +7,7 @@ import { faNumber, months } from '@/lib/jalali';
 import { listBookingReceipts } from './receipt-access';
 import type { BookingReceiptData, ReceiptProof } from './receipt-model';
 import { useLiveReceipt } from './use-live-receipt';
+import { ReceiptEditor } from './ReceiptEditor';
 import './receipt.css';
 
 type Props = ({ receipt: BookingReceiptData; proof?: never } | { proof: ReceiptProof; receipt?: never }) & {
@@ -17,13 +18,15 @@ type Props = ({ receipt: BookingReceiptData; proof?: never } | { proof: ReceiptP
 
 export function BookingReceipt({ receipt: initial, proof: stored, preview = false, headingRef, notificationsDisabled = false }: Props) {
   const [issuedProof] = useState(() => initial && !preview ? listBookingReceipts().find(entry => entry.reference === initial.reference) : undefined);
-  const proof = stored ?? issuedProof;
-  const { state, refresh } = useLiveReceipt(proof, initial);
+  const proof = preview ? undefined : stored ?? issuedProof;
+  const { state, refresh, canEdit, change, closeEditor } = useLiveReceipt(proof, initial);
   const referenceElement = useRef<HTMLElement>(null);
   const feedback = useRef<HTMLParagraphElement>(null);
+  const moveButton = useRef<HTMLButtonElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
   const [copyMessage, setCopyMessage] = useState('');
   useEffect(() => {
-    if ((state.status === 'error' && state.calendar) || (state.status === 'ready' && state.notice)) {
+    if ((state.status === 'error' && (state.calendar || state.uncertain)) || (state.status === 'ready' && state.notice)) {
       feedback.current?.focus({ preventScroll: true });
     }
   }, [state]);
@@ -32,7 +35,8 @@ export function BookingReceipt({ receipt: initial, proof: stored, preview = fals
     return <div className="receipt-lookup">
       <p role="status" ref={feedback} tabIndex={-1}>{state.status === 'loading'
         ? state.calendar ? 'در حال بررسی نوبت برای تقویم…' : 'در حال دریافت وضعیت نوبت…'
-        : state.calendar ? 'وضعیت نوبت دریافت نشد و فایل تقویم آماده نشد.' : 'وضعیت نوبت دریافت نشد. دوباره تلاش کن یا با تینا تماس بگیر.'}</p>
+        : state.uncertain ? 'وضعیت فعلی نوبت پس از درخواست تغییر مشخص نیست. رسید را دوباره دریافت کن یا با تینا تماس بگیر.'
+          : state.calendar ? 'وضعیت نوبت دریافت نشد و فایل تقویم آماده نشد.' : 'وضعیت نوبت دریافت نشد. دوباره تلاش کن یا با تینا تماس بگیر.'}</p>
       {state.status === 'error' && <div><button type="button" className="text-button" onClick={() => void refresh()}>دریافت دوبارهٔ رسید</button><a className="text-button" href={salon.phoneLink}>تماس با تینا</a></div>}
     </div>;
   }
@@ -73,10 +77,23 @@ export function BookingReceipt({ receipt: initial, proof: stored, preview = fals
     </article>
     <p className="copy-status" role="status">{copyMessage}</p>
     {state.notice && <p className="copy-status" role="status" ref={feedback} tabIndex={-1}>{state.notice}</p>}
+    {proof && !preview && !state.editor && <div className="receipt-manage">
+      {canEdit && <>
+        <button className="button ticket-manage" ref={moveButton} type="button" disabled={state.saving} onClick={() => void refresh('reschedule')}>تغییر زمان نوبت</button>
+        <button className="text-button ticket-cancel" ref={cancelButton} type="button" disabled={state.saving} onClick={() => void refresh('cancel')}>لغو نوبت</button>
+        {state.saving && <p role="status">در حال بررسی وضعیت نوبت…</p>}
+      </>}
+      {!state.checked && !cancelled && Date.parse(receipt.startsAt) > Date.now() && <button className="button ticket-manage" type="button" onClick={() => void refresh()}>بررسی و مدیریت نوبت</button>}
+    </div>}
+    {canEdit && state.editor && <ReceiptEditor key={state.editor} mode={state.editor} receipt={receipt} pending={state.saving} onChange={change} onClose={() => {
+      const trigger = state.editor === 'cancel' ? cancelButton : moveButton;
+      closeEditor();
+      requestAnimationFrame(() => trigger.current?.focus());
+    }} />}
     <div className="receipt-actions">
-      {proof && !preview && !cancelled && <button className="button primary ticket-calendar" type="button" onClick={() => void refresh(true)}><Icon name="calendar" size={18} />افزودن به تقویم گوشی</button>}
-      <button type="button" className="button ticket-print" onClick={() => window.print()}>چاپ یا ذخیرهٔ PDF</button>
-      <a className="ticket-contact" href={salon.phoneLink}>{cancelled ? 'تماس با تینا' : 'تغییر وقت؟ تماس با تینا'} <Icon name="phone" size={17} /></a>
+      {proof && !preview && !cancelled && <button className="button primary ticket-calendar" type="button" disabled={state.saving} onClick={() => void refresh('calendar')}><Icon name="calendar" size={18} />افزودن به تقویم گوشی</button>}
+      <button type="button" className="button ticket-print" disabled={state.saving} onClick={() => window.print()}>چاپ یا ذخیرهٔ PDF</button>
+      <a className="ticket-contact" href={salon.phoneLink}>تماس با تینا <Icon name="phone" size={17} /></a>
     </div>
     {cancelled && <p className="receipt-save-hint">اگر نوبت را در تقویم گوشی ذخیره کرده‌ای، آن را از تقویم هم پاک کن.</p>}
     {notificationsDisabled && !cancelled && <p className="receipt-save-hint">فعلاً پیامک ارسال نمی‌شود؛ رسید نوبتت را نگه دار.</p>}

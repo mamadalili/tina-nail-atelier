@@ -35,8 +35,8 @@ await transform('src/features/home/CinematicHero.tsx', [["import Image from 'nex
 await transform('src/components/Header.tsx', [['href="/"', 'href="/tina-preview/"']]);
 await transform('src/app/receipt-preview/page.tsx', [["export const dynamic = 'force-dynamic';", "export const dynamic = 'force-static';"]]);
 await transform('src/app/robots.ts', [["export default", "export const dynamic = 'force-static';\n\nexport default"]]);
-const revision = spawnSync('git', ['-c', `safe.directory=${repo.replaceAll('\\', '/')}`, 'rev-parse', '--short', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
-if (!/^[a-f0-9]{7,40}$/.test(revision)) throw new Error('Missing source revision');
+const [commit, revision] = spawnSync('git', ['-c', `safe.directory=${repo.replaceAll('\\', '/')}`, 'log', '-1', '--format=%H %h'], { cwd: repo, encoding: 'utf8' }).stdout.trim().split(' ');
+if (!/^[a-f0-9]{40}$/.test(commit) || !/^[a-f0-9]{7,40}$/.test(revision) || !commit.startsWith(revision)) throw new Error('Missing source revision');
 const releaseTag = 'booking-' + revision;
 await transform('src/app/layout.tsx', [['export const metadata: Metadata = {', `export const metadata: Metadata = {\n  other: { 'tina-preview-release': '${releaseTag}', 'tina-preview-source': '${revision}' },`]]);
 const env = { ...process.env, DATABASE_URL: '', SITE_URL: '', NEXT_PUBLIC_BOOKING_ADAPTER: 'shared-host', NEXT_PUBLIC_BASE_PATH: '/tina-preview', NEXT_PUBLIC_RELEASE_REVISION: revision, RECEIPT_PREVIEW_ENABLED: 'true', NEXT_TELEMETRY_DISABLED: '1' };
@@ -47,13 +47,28 @@ for (const [binary, args] of [['node', ['node_modules/prisma/build/index.js', 'g
 const publicDir = join(release, 'public_html/tina-preview');
 await cp(join(stage, 'out'), publicDir, { recursive: true, filter: path => !['.gitkeep', 'burgundy-colour-study.png'].includes(path.split(/[\\/]/).at(-1)) });
 await mkdir(join(publicDir, 'api'), { recursive: true });
-for (const endpoint of ['booking.php', 'options.php', 'receipt.php', 'metrics.php', 'services.php']) {
-  await cp(join(repo, 'deploy/shared-host/public', endpoint), join(publicDir, 'api', endpoint));
+async function exportEndpoint(name, target) {
+  const php = await readFile(join(repo, 'deploy/shared-host/public', name), 'utf8');
+  const declaration = 'declare(strict_types=1);';
+  if (!php.includes(declaration)) throw new Error('Missing PHP declaration in ' + name);
+  await writeFile(target, php.replace(declaration, declaration + "\nheader('X-Tina-Api-Source: " + commit + "');"));
 }
-await cp(join(repo, 'deploy/shared-host/runtime'), join(release, 'tina-booking-runtime'), { recursive: true });
+for (const endpoint of ['booking.php', 'options.php', 'receipt.php', 'metrics.php', 'services.php']) {
+  await exportEndpoint(endpoint, join(publicDir, 'api', endpoint));
+}
+const runtime = join(repo, 'deploy/shared-host/runtime');
+await cp(runtime, join(release, 'tina-booking-runtime'), {
+  recursive: true,
+  filter: path => path === runtime || (dirname(path) === runtime && /^(?:[A-Z][a-zA-Z0-9]*\.php|calendar\.php|sync_release\.py)$/.test(path.split(sep).at(-1))),
+});
+const storePath = join(release, 'tina-booking-runtime/BookingStore.php');
+const storeSource = await readFile(storePath, 'utf8');
+const storeMarker = "public const RELEASE_SOURCE = 'local';";
+if (!storeSource.includes(storeMarker)) throw new Error('Missing runtime release marker');
+await writeFile(storePath, storeSource.replace(storeMarker, "public const RELEASE_SOURCE = '" + commit + "';"));
 await writeFile(join(release, 'tina-booking-runtime/.htaccess'), 'Require all denied\n');
 await writeFile(join(publicDir, '.htaccess'), `Options -Indexes\nDirectoryIndex index.html\n<IfModule mime_module>\nAddHandler application/x-httpd-ea-php84 .php\n</IfModule>\n<IfModule mod_headers.c>\nHeader always set X-Robots-Tag "noindex, nofollow"\nHeader always set X-Tina-Preview-Release "${releaseTag}"\n<FilesMatch "\\.(html|txt|json)$">\nHeader set Cache-Control "no-cache, must-revalidate"\n</FilesMatch>\n</IfModule>\n`);
-await writeFile(join(publicDir, 'preview-release.json'), JSON.stringify({ source_commit: revision, release: releaseTag, booking_live: true, notifications: false }));
+await writeFile(join(publicDir, 'preview-release.json'), JSON.stringify({ source_commit: revision, source_sha: commit, release: releaseTag, booking_live: true, notifications: false }));
 
 const adminStage = await mkdtemp(join(parent, 'tina-admin-stage-'));
 for (const name of ['src', 'tsconfig.json', 'next-env.d.ts', 'package.json', 'package-lock.json']) {
@@ -69,8 +84,8 @@ const adminBuild = spawnSync('node', ['node_modules/next/dist/bin/next', 'build'
 if (adminBuild.status !== 0) process.exit(adminBuild.status ?? 1);
 const adminDir = join(release, 'public_html/tina-administrator');
 await cp(join(adminStage, 'out'), adminDir, { recursive: true });
-await cp(join(repo, 'deploy/shared-host/public/admin.php'), join(adminDir, 'api.php'));
+await exportEndpoint('admin.php', join(adminDir, 'api.php'));
 await writeFile(join(adminDir, '.htaccess'), `Options -Indexes\nDirectoryIndex index.html\n<IfModule mime_module>\nAddHandler application/x-httpd-ea-php84 .php\n</IfModule>\n<IfModule mod_headers.c>\nHeader always set X-Robots-Tag "noindex, nofollow"\nHeader always set Cache-Control "no-store, private"\nHeader always set X-Frame-Options "DENY"\nHeader always set X-Content-Type-Options "nosniff"\nHeader always set Referrer-Policy "same-origin"\n</IfModule>\n`);
 await mkdir(join(repo, 'artifacts'), { recursive: true });
-await writeFile(join(repo, 'artifacts/shared-host-release.json'), JSON.stringify({ stage, adminStage, release, revision }, null, 2));
+await writeFile(join(repo, 'artifacts/shared-host-release.json'), JSON.stringify({ stage, adminStage, release, revision, commit }, null, 2));
 console.log(JSON.stringify({ stage, adminStage, release, revision }));

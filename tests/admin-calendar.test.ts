@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { daySlots, validDateChange, monthSummary, mutationRecovery } from '../src/features/admin/model';
+import { daySlots, validDateChange, monthSchema, monthSummary, mutationRecovery } from '../src/features/admin/model';
 
 test('daily slots distinguish bookings, blocks and cancellation without hiding empty hours', () => {
   const active = { reference: 'TN-AAAAAAAAAAAAAAAA', staff: 'tina', status: 'CONFIRMED', version: 1, name: 'مهمان', phone: '09000000000', service: 'pedicure', manicureType: '', date: '1405-08-16', period: '12-14', note: '', issuedAt: '2026-11-04T08:00:00Z', updatedAt: null } as const;
@@ -14,6 +14,15 @@ test('stale edits and unknown outcomes require a fresh record before another cha
   assert.deepEqual(mutationRecovery(undefined), { closeDialog: true, refreshCalendar: true });
   assert.deepEqual(mutationRecovery(409, 'SLOT_TAKEN'), { closeDialog: false, refreshCalendar: true });
   assert.deepEqual(mutationRecovery(422, 'VALIDATION'), { closeDialog: false, refreshCalendar: false });
+});
+test('a weekly or leave closure is distinguished from a manually reopenable hour', () => {
+  const day = '1405-08-16';
+  const calendar = monthSchema.parse({ month: '1405-08', staff: 'sonia', appointments: [], blocks: [
+    { date: day, period: '10-12', source: 'schedule' }, { date: day, period: '12-14' },
+  ] });
+  const [scheduled, manual] = daySlots(day, [], calendar.blocks);
+  assert.equal(scheduled.source, 'schedule');
+  assert.equal(manual.source, 'manual');
 });
 test('Persian date selectors clamp invalid leap/month-end days', () => {
   assert.equal(validDateChange('1403-12-30', 'year', 1404), '1404-12-29');

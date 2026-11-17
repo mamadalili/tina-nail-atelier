@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/server/db';
 import { isAllowedDay, todayInTehran } from '@/lib/jalali';
 import { staffMembers } from '@/content/salon';
+import { unavailableSlots } from '@/server/staff-schedules';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   if (!isAllowedDay(day, todayInTehran())) return NextResponse.json({ message: 'روز معتبر انتخاب کن.' }, { status: 400, headers });
   if (!process.env.DATABASE_URL || process.env.BOOKING_ENABLED !== 'true') return NextResponse.json({ message: 'رزرو آنلاین هنوز فعال نیست.' }, { status: 503, headers });
   try {
-    const bookings = await getDb().appointmentRequest.findMany({ where: { staff, jalaliDay: day, status: 'CONFIRMED' }, select: { period: true } });
-    return NextResponse.json({ date: day, taken: bookings.map(booking => booking.period) }, { headers });
+    const slots = await unavailableSlots(getDb(), day, day, [staff]);
+    return NextResponse.json({ date: day, taken: slots.map(slot => slot.period) }, { headers });
   } catch { return NextResponse.json({ message: 'دریافت ساعت‌ها انجام نشد؛ دوباره تلاش کن.' }, { status: 503, headers }); }
 }

@@ -8,6 +8,10 @@ Use **پنل مدیریت** in the public site header, select Tina or Sonia, and
 
 The calendar can inspect previous months. New/moved appointments and closures use the same Tehran time and 90-day window as public booking. Past guest details can be corrected without moving the appointment. On narrow screens the calendar and daily list stack; below 360px a native day selector replaces the grid. Use Logout on a shared device.
 
+Each staff calendar has a weekly working-hours editor and individual leave dates. Select the artist first, then set the available two-hour periods for each weekday or add a Jalali leave date. New schedules start with all four periods open every day. If a change would close a confirmed future appointment, the panel identifies it for coordination and keeps the previous schedule. A closure from the weekly schedule or a leave date is managed in that editor. The individual slot controls continue to manage one-off closures.
+
+Guests with their private receipt can change the day or time with the same artist, or cancel before the appointment begins. The panel and reopened receipt reflect the change. A successful cancellation frees only that artist's slot.
+
 Either account can enter the full receipt reference under **جست‌وجو با کد پیگیری**. A match opens the staff calendar and date and focuses the matching appointment. A cancelled appointment opens in that day’s cancellation history.
 
 **آمار فرم رزرو** reports form starts, first time selections, confirmed receipts received, the median time from a start to its first selection, and receipts as a percentage of starts. Select the last 30 days, the last seven days, or the preceding seven days to compare periods. Counts use the start cohort for the selected window. Measurement begins with this release. Historical appointments do not establish a conversion baseline.

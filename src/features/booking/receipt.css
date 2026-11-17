@@ -32,6 +32,20 @@
 .ticket-stub strong { overflow-wrap: anywhere; user-select: all; display: block; margin-top: 4px; font-family: ui-monospace, monospace; font-size: .9rem; letter-spacing: .04em; }
 .ticket-copy { flex-shrink: 0; }
 .copy-status:not(:empty) { margin-top: 8px; font-size: .85rem; color: var(--green); }
+.receipt-manage:not(:empty), .receipt-editor-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; margin-top: 18px; }
+.ticket-manage { border-color: var(--control-line); color: var(--green); }
+.ticket-cancel { color: var(--red); }
+.receipt-editor { margin-top: 20px; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.receipt-editor h4 { font-size: 1.15rem; }
+.receipt-editor p { margin-top: 8px; font-size: .85rem; line-height: 1.9; }
+.receipt-new-time { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 0; padding: 0; min-width: 0; border: 0; }
+.receipt-new-time label { display: grid; gap: 6px; font-size: .85rem; }
+.receipt-new-time select { min-width: 0; width: 100%; min-height: 46px; font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--control-line); border-radius: var(--radius); padding: 6px; }
+.receipt-new-time p { grid-column: 1 / -1; }
+.receipt-danger { background: var(--red); color: var(--on-dark); }
+.receipt-editor .button, .receipt-manage .button { min-height: 46px; font-size: .86rem; }
+.receipt-editor :disabled { opacity: .55; cursor: default; }
+@media (max-width: 420px) { .receipt-new-time { grid-template-columns: 1fr; } .receipt-editor { padding: 16px; } }
 .receipt-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-top: 22px; }
 .receipt-actions .button { min-height: 48px; font-size: .86rem; }
 .receipt-actions .ticket-calendar { gap: 8px; }
@@ -77,7 +91,7 @@
   body:has(.appointment-ticket) *:not(:has(.receipt-experience)):not(.receipt-experience):not(.receipt-experience *) { display: none !important; }
   body:has(.appointment-ticket) :is(main, .booking-section.section, .booking-layout.wrap, .booking-frame, .receipt-preview-page) { display: block; width: 100%; margin: 0; padding: 0; border: 0; }
   .receipt-experience { page: appointment; position: static; width: 100%; max-width: 640px; margin: 0 auto; }
-  .receipt-experience .receipt-intro, .receipt-experience .receipt-actions, .receipt-experience .receipt-save-hint { display: none; }
+  .receipt-experience .receipt-intro, .receipt-experience .receipt-actions, .receipt-experience .receipt-save-hint, .receipt-experience .receipt-editor, .receipt-experience .receipt-manage { display: none; }
   .appointment-ticket { box-shadow: none; print-color-adjust: exact; break-inside: avoid; border: 1px solid #c4cdc5; }
   .ticket-stub::before, .ticket-stub::after { background: white; }
 }

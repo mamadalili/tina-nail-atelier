@@ -33,10 +33,11 @@ try{
             require $runtime.'/BookingMetrics.php';
             adminRespond(200,(new BookingMetrics($runtime.'/data/metrics.sqlite'))->report($now,$period));
         }
-        if($action!=='month')adminRespond(404,['message'=>'این بخش پیدا نشد.']);
-        $month=$_GET['month']??'';if(!is_string($month))adminRespond(400,['message'=>'ماه معتبر انتخاب کن.']);
+        if(!in_array($action,['month','schedule'],true))adminRespond(404,['message'=>'این بخش پیدا نشد.']);
         $store=new BookingStore($runtime.'/data/appointments.sqlite');
         $staff=$_GET['staff']??$username;if(!is_string($staff))adminRespond(400,['message'=>'فرد معتبر انتخاب کن.']);
+        if($action==='schedule')adminRespond(200,$store->schedule($staff));
+        $month=$_GET['month']??'';if(!is_string($month))adminRespond(400,['message'=>'ماه معتبر انتخاب کن.']);
         adminRespond(200,$store->adminMonth($month,$staff));
     }
     if($_SERVER['REQUEST_METHOD']!=='POST'){header('Allow: GET, POST');adminRespond(405,['message'=>'این روش درخواست مجاز نیست.']);}
@@ -54,7 +55,13 @@ try{
     if((int)($_SERVER['CONTENT_LENGTH']??0)>$bodyLimit)adminRespond(413,['message'=>'حجم درخواست زیاد است.']);
     $raw=file_get_contents('php://input',false,null,0,$bodyLimit+1);
     if($raw===false||strlen($raw)>$bodyLimit)adminRespond(413,['message'=>'حجم درخواست زیاد است.']);
-    try{$body=json_decode($raw,true,32,JSON_THROW_ON_ERROR);}catch(JsonException $error){adminRespond(400,['message'=>'درخواست خوانده نشد.']);}
+    // For weekly hours, distinguish a JSON object from an empty list (a deliberately closed day).
+    try{
+        if($action==='saveSchedule'){
+            $object=json_decode($raw,false,32,JSON_THROW_ON_ERROR);
+            $body=$object instanceof stdClass ? get_object_vars($object) : null;
+        }else{$body=json_decode($raw,true,32,JSON_THROW_ON_ERROR);}
+    }catch(JsonException $error){adminRespond(400,['message'=>'درخواست خوانده نشد.']);}
     if(!is_array($body))adminRespond(400,['message'=>'درخواست معتبر نیست.']);
     if($action==='login'){
         $username=$body['username']??null;
@@ -74,6 +81,7 @@ try{
         adminRespond(200,['authenticated'=>false]);
     }
     $store=new BookingStore($runtime.'/data/appointments.sqlite');$clock=new DateTimeImmutable('now',new DateTimeZone('Asia/Tehran'));
+    if($action==='saveSchedule')adminRespond(200,$store->saveSchedule($body));
     if($action==='search'){
         $record=$store->adminFind($body['reference']??null);
         if($record===null)adminRespond(404,['code'=>'REFERENCE_NOT_FOUND','message'=>'نوبتی با این کد پیگیری پیدا نشد.']);
@@ -89,6 +97,6 @@ try{
     if($action==='cancel'){$store->adminCancel($body['reference'],$body['version'],$clock);adminRespond(200,['ok'=>true]);}
     $record=$store->adminUpdate($body['reference'],$body['version'],$body['data']??null,$clock);adminRespond(200,['appointment'=>$record]);
 }catch(PortfolioFailure $error){adminRespond($error->status,['message'=>$error->getMessage()]);}
-catch(BookingFailure $error){adminRespond($error->status,['code'=>$error->errorCode,'message'=>$error->getMessage()]+($error->errors?['errors'=>$error->errors]:[]));}
+catch(BookingFailure $error){adminRespond($error->status,['code'=>$error->errorCode,'message'=>$error->getMessage()]+($error->errors?['errors'=>$error->errors]:[])+($error->conflicts?['conflicts'=>$error->conflicts]:[]));}
 catch(AdminAuthFailure $error){adminRespond($error->status,['message'=>$error->getMessage()]);}
 catch(Throwable $error){adminRespond(503,['message'=>'ارتباط با پنل برقرار نشد؛ کمی بعد دوباره تلاش کن.']);}
