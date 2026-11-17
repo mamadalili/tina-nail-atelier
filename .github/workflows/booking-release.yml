@@ -112,26 +112,27 @@ jobs:
             exit 0
           fi
           tag="booking-$GITHUB_SHA"
+          release_digest="$TESTED_DIGEST"
           echo "$TESTED_DIGEST  tina-salon.zip" | sha256sum --check --status
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "Tina booking · ${GITHUB_SHA:0:7}" --notes-file hosting-notes.md tina-salon.zip
           else
-            existing="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '.assets[] | select(.name=="tina-salon.zip") | .digest')"
+            release_id="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json databaseId --jq .databaseId)"
+            existing="$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" --jq '.assets[] | select(.name=="tina-salon.zip") | .digest')"
             if [[ "$existing" != "sha256:$TESTED_DIGEST" ]]; then
               if [[ "$existing" =~ ^sha256:[0-9a-f]{64}$ ]] && python3 -c 'import runpy,sys; sys.exit(0 if runpy.run_path("deploy/shared-host/runtime/sync_release.py")["ci_verified_asset"](sys.argv[1], sys.argv[2]) else 1)' "$GITHUB_SHA" "${existing#sha256:}"; then
                 echo 'An independently tested package for this revision is already published.'
-                echo 'published=true' >> "$GITHUB_OUTPUT"
-                exit 0
+                release_digest="${existing#sha256:}"
+              else
+                gh release upload "$tag" tina-salon.zip --repo "$GITHUB_REPOSITORY" --clobber
               fi
-              gh release upload "$tag" tina-salon.zip --repo "$GITHUB_REPOSITORY" --clobber
             fi
-          fi
-          if [[ "$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" == true ]]; then
-            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false \
+              --title "Tina booking · ${GITHUB_SHA:0:7}" --notes-file hosting-notes.md
           fi
           published="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '.assets[] | select(.name=="tina-salon.zip") | .digest')"
-          [[ "$published" == "sha256:$TESTED_DIGEST" ]]
+          [[ "$published" == "sha256:$release_digest" ]]
           echo 'published=true' >> "$GITHUB_OUTPUT"
 
   verify-domain:
