@@ -26,7 +26,7 @@ function invalidChange() {
 
 const startedMessages = {
   BOOKING_STARTED: 'زمان این نوبت رسیده و دیگر قابل تغییر نیست.',
-  TARGET_STARTED: 'ساعت انتخابی شروع شده است؛ روز یا ساعت دیگری انتخاب کن.',
+  TARGET_STARTED: 'ساعت انتخابی شروع شده است. روز یا ساعت دیگری انتخاب کن.',
 };
 
 function ensureFuture(startsAt: Date, code: keyof typeof startedMessages = 'BOOKING_STARTED') {
@@ -53,7 +53,7 @@ export async function changeGuestReceipt(db: PrismaClient, proof: ReceiptProof, 
       if (!parsed.success) throw invalidChange();
       const change = parsed.data;
       if (change.action === 'reschedule' && process.env.BOOKING_ENABLED !== 'true') {
-        throw new ReservationError(503, 'BOOKING_DISABLED', 'تغییر زمان نوبت فعلاً در دسترس نیست؛ کمی بعد دوباره تلاش کن.');
+        throw new ReservationError(503, 'BOOKING_DISABLED', 'تغییر زمان نوبت فعلاً در دسترس نیست. کمی بعد دوباره تلاش کن.');
       }
       const record = await tx.appointmentRequest.findUniqueOrThrow({ where: { id: locked.id }, select: receiptSelect });
       const originalStart = record.startsAt ?? slotTimes(record.jalaliDay, record.period).startsAt;
@@ -65,7 +65,7 @@ export async function changeGuestReceipt(db: PrismaClient, proof: ReceiptProof, 
         return currentReceiptFor(record);
       }
       if (change.version !== record.version || record.status !== 'CONFIRMED') {
-        throw new ReservationError(409, 'STALE_BOOKING', 'وضعیت نوبت تغییر کرده است؛ رسید را دوباره بررسی کن.');
+        throw new ReservationError(409, 'STALE_BOOKING', 'وضعیت نوبت تغییر کرده است. رسید را دوباره بررسی کن.');
       }
       ensureFuture(originalStart);
 

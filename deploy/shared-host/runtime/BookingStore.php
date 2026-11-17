@@ -202,7 +202,7 @@ final class BookingStore {
             $now ??= new DateTimeImmutable();
             $today = $now->setTimezone(new DateTimeZone('Asia/Tehran'))->setTime(0, 0);
             $current = $this->schedule($staff);
-            if ($current['version'] !== $version) throw new BookingFailure('STALE_SCHEDULE', 409, 'برنامهٔ کاری تغییر کرده است؛ آن را تازه کن و دوباره بررسی کن.');
+            if ($current['version'] !== $version) throw new BookingFailure('STALE_SCHEDULE', 409, 'برنامهٔ کاری تغییر کرده است. آن را تازه کن و دوباره بررسی کن.');
             $next = self::scheduleInput($body, $current, $today);
             $query = $this->db->prepare("SELECT reference,jalali_day AS date,period FROM appointments WHERE staff=? AND status='CONFIRMED' AND jalali_day>=? ORDER BY jalali_day,period");
             $query->execute([$staff, self::jalaliDay($today)]);
@@ -213,7 +213,7 @@ final class BookingStore {
                 if ($start > $now && in_array($period, self::closedPeriods($next, $day, $start), true)
                     && !in_array($period, self::closedPeriods($current, $day, $start), true)) $conflicts[] = $booking;
             }
-            if ($conflicts) throw new BookingFailure('SCHEDULE_CONFLICT', 409, 'این ساعت‌ها نوبت دارند؛ ابتدا نوبت‌های زیر را جابه‌جا یا لغو کن.', [], $conflicts);
+            if ($conflicts) throw new BookingFailure('SCHEDULE_CONFLICT', 409, 'این ساعت‌ها نوبت دارند. ابتدا نوبت‌های زیر را جابه‌جا یا لغو کن.', [], $conflicts);
             $query = $this->db->prepare('INSERT INTO staff_schedules(staff,version,week,days_off) VALUES (?,?,?,?) ON CONFLICT(staff) DO UPDATE SET version=excluded.version,week=excluded.week,days_off=excluded.days_off');
             $query->execute([$staff,$next['version'],json_encode($next['week'], JSON_THROW_ON_ERROR),json_encode($next['daysOff'], JSON_THROW_ON_ERROR)]);
             $this->audit(null, 'SCHEDULE', $next, $now);
@@ -327,7 +327,7 @@ final class BookingStore {
             $start = self::slotStart(self::gregorian($day), $period);
             $occupied = in_array($period, self::closedPeriods($this->schedule($staff), $day, $start), true);
         }
-        if($occupied)throw new BookingFailure('SLOT_TAKEN',409,'این ساعت در دسترس نیست؛ ساعت دیگری انتخاب کن.',['period'=>'این ساعت رزرو یا بسته شده است.']);
+        if($occupied)throw new BookingFailure('SLOT_TAKEN',409,'این ساعت در دسترس نیست. ساعت دیگری انتخاب کن.',['period'=>'این ساعت رزرو یا بسته شده است.']);
     }
 
     private function provedBooking(mixed $reference, mixed $requestKey, bool $includePayload = false): ?array {
@@ -383,7 +383,7 @@ final class BookingStore {
             $currentVersion = (int)$row['version'];
             $alreadyDone = $cancel ? $row['status'] === 'CANCELLED' : $row['status'] === 'CONFIRMED' && $day === $row['jalali_day'] && $period === $row['period'];
             if ($version > $currentVersion || (!$alreadyDone && ($version !== $currentVersion || $row['status'] !== 'CONFIRMED'))) {
-                throw new BookingFailure('STALE_BOOKING', 409, 'این نوبت تغییر کرده است؛ رسید را تازه کن و دوباره بررسی کن.');
+                throw new BookingFailure('STALE_BOOKING', 409, 'این نوبت تغییر کرده است. رسید را تازه کن و دوباره بررسی کن.');
             }
             // A lost response can be retried after the slot starts. It must never write a second history entry.
             if ($alreadyDone && ($cancel || $version < $currentVersion)) {

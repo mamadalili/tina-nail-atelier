@@ -28,13 +28,13 @@ The calendar refreshes its availability in the browser. The server checks staff 
 
 The **Booking release** workflow tests the Node and PHP backends, builds both site exports and exercises the actual ZIP. It publishes the tested file as `tina-salon.zip` under the tag `booking-<full main commit>`. The package and live-site confirmation are separate jobs. The latter checks the full commit on the domain, both page versions, the booking service and the availability response.
 
-On the cPanel account, add one **Cron Jobs** entry at `*/5 * * * *`. After extracting a release into Home, the command is:
+On the cPanel account, add one **Cron Jobs** entry at `*/5 * * * *`. After extracting a release into Home, use this command.
 
 ```sh
 /usr/bin/python3 "$HOME/tina-booking-runtime/sync_release.py"
 ```
 
-The release notes also provide a one-time setup command for an existing installation that does not yet contain the updater. That command pins the initial script to the release commit and verifies its SHA-256. Both forms use the public GitHub repository over HTTPS. The hosting account runs the script from its private runtime directory; GitHub needs no hosting password.
+The release notes also provide a one-time setup command for an existing installation that does not yet contain the updater. That command pins the initial script to the release commit and verifies its SHA-256. Both forms use the public GitHub repository over HTTPS. The hosting account runs the script from its private runtime directory without sharing hosting credentials with GitHub.
 
 On each update, the installer compares the current main commit, the full commit in the package, the release asset digest, and the SHA-256 recorded by a successful main workflow job. A private lock serializes installations. Existing hashed assets stay available for open browser tabs. The live check verifies the deployed PHP APIs and storage code as well as the two page versions. A failed domain check restores the previous application files and an interrupted installation recovers on the next run. The installer never copies or restores booking databases, photos in SQLite, or account credentials. Keep the normal hosting backups for those records.
 

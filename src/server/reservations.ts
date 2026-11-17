@@ -11,7 +11,7 @@ export class ReservationError extends Error {
 }
 
 export function slotTaken() {
-  return new ReservationError(409, 'SLOT_TAKEN', 'این بازه در دسترس نیست؛ ساعت یا روز دیگری انتخاب کن.', { period: 'این بازه دیگر خالی نیست.' });
+  return new ReservationError(409, 'SLOT_TAKEN', 'این بازه در دسترس نیست. ساعت یا روز دیگری انتخاب کن.', { period: 'این بازه دیگر خالی نیست.' });
 }
 
 export async function reserveAppointment(db: PrismaClient, key: string, input: unknown, now = new Date()) {
