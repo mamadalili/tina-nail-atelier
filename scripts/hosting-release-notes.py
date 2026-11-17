@@ -14,7 +14,7 @@ if not re.fullmatch(r'[0-9a-f]{40}', commit):
 base = 'https://raw.githubusercontent.com/mamadalili/tina-nail-atelier/' + commit + '/deploy/shared-host/runtime/'
 initializers = []
 for name, digest in scripts.items():
-    initializers.append('(curl -q -fsSL --proto "=https" ' + base + name +
+    initializers.append('(curl -q --http1.1 -fsSL --proto "=https" ' + base + name +
                         ' -o .sync-initial && echo "' + digest + '  .sync-initial" | sha256sum -c --status && '
                         'mv .sync-initial ' + name + ')')
 command = ('cd "$HOME/tina-booking-runtime" && (test -s tina-run-release.sh || (' +

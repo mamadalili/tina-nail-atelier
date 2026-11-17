@@ -188,6 +188,7 @@ class ReleaseSyncTests(unittest.TestCase):
     def curl_process(self, headers, body):
         def start(command, **kwargs):
             self.assertEqual(command[:2], ['curl', '-q'], 'Do not inherit account curlrc redirects or TLS settings')
+            self.assertIn('--http1.1', command, 'The shared host reports HTTP/2 framing failures (curl 16)')
             self.assertNotIn('--insecure', command)
             self.assertNotIn('--location', command)
             self.assertEqual(command[command.index('--proto') + 1], '=https')
