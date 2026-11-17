@@ -1,5 +1,6 @@
 """cPanel cron entry point. Pull tested releases for this salon from its public GitHub repository."""
 import fcntl
+from email import message_from_bytes
 import hashlib
 import io
 import json
@@ -8,11 +9,12 @@ from pathlib import Path
 import re
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 import time
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from urllib.request import build_opener, HTTPRedirectHandler, Request
 import zipfile
 
@@ -35,7 +37,7 @@ def is_code_path(name):
     if any(not re.fullmatch(r'[a-zA-Z0-9_.-]+', part) or part in ('.', '..') for part in parts):
         return False
     if parts[0] == RUNTIME:
-        return len(parts) == 2 and (parts[1] in {'.htaccess', 'calendar.php', 'sync_release.py'}
+        return len(parts) == 2 and (parts[1] in {'.htaccess', 'calendar.php', 'sync_release.py', 'tina-run-release.sh'}
                                     or re.fullmatch(r'[A-Z][a-zA-Z0-9]*\.php', parts[1]) is not None)
     if len(parts) < 3 or parts[:2] not in (['public_html', 'tina-preview'], ['public_html', 'tina-administrator']):
         return False
@@ -194,7 +196,65 @@ class HttpsRedirects(HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
+def curl_response(url, limit, method):
+    # Some shared hosts expose a working system TLS client but disconnect Python's HTTPS client.
+    # Handle redirects ourselves so neither client can leave the same allowlisted HTTPS hosts.
+    for _ in range(6):
+        if urlsplit(url).scheme != 'https' or urlsplit(url).netloc not in ALLOWED_HOSTS:
+            raise ValueError('Unexpected download redirect')
+        with tempfile.TemporaryDirectory(prefix='salon-download-') as directory:
+            header_file = Path(directory) / 'headers'
+            command = ['curl', '--silent', '--show-error', '--proto', '=https',
+                       '--connect-timeout', '10', '--max-time', '50', '--max-filesize', str(limit),
+                       '--dump-header', str(header_file), '--user-agent', 'Tina-Atelier-Release',
+                       '--header', 'Cache-Control: no-cache']
+            if method == 'HEAD':
+                command.append('--head')
+            elif method != 'GET':
+                raise ValueError('Unsupported download method')
+            process = subprocess.Popen(command + [url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                content = process.stdout.read(limit + 1)
+                if len(content) > limit:
+                    raise ValueError('Download exceeds size limit')
+                process.communicate(timeout=60)
+                if process.returncode:
+                    raise OSError('HTTPS download failed for ' + urlsplit(url).netloc + ' (curl ' + str(process.returncode) + ')')
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+            with header_file.open('rb') as stream:
+                raw = stream.read(65537)
+            if len(raw) > 65536:
+                raise ValueError('Response headers exceed size limit')
+            blocks = [part for part in raw.replace(b'\r\n', b'\n').split(b'\n\n') if part.startswith(b'HTTP/')]
+            if not blocks:
+                raise ValueError('Missing HTTPS response status')
+            status_line, _, fields = blocks[-1].partition(b'\n')
+            status = re.fullmatch(rb'HTTP/\S+ ([0-9]{3})(?: .*)?', status_line)
+            if not status:
+                raise ValueError('Invalid HTTPS response status')
+            code = int(status.group(1))
+            headers = message_from_bytes(fields)
+            if code in (301, 302, 303, 307, 308):
+                if not headers.get('Location'):
+                    raise ValueError('Missing download redirect')
+                url = urljoin(url, headers['Location'])
+                continue
+            if not 200 <= code < 300:
+                raise HTTPError(url, code, 'HTTPS request failed', headers, None)
+            return (b'' if method == 'HEAD' else content), headers
+    raise ValueError('Too many download redirects')
+
+
 def download(url, limit=1024 * 1024, revision=None, store=False, method='GET'):
+    if os.environ.get('TINA_RELEASE_CURL') == '1':
+        result, headers = curl_response(url, limit, method)
+        if revision and (headers.get('X-Tina-Api-Source') != revision or
+                         (store and headers.get('X-Tina-Store-Source') != revision)):
+            raise ValueError('PHP returned a different release')
+        return result
     request = Request(url, method=method, headers={'User-Agent': 'Tina-Atelier-Release', 'Cache-Control': 'no-cache'})
     with build_opener(HttpsRedirects()).open(request, timeout=18) as response:
         if revision and (response.headers.get('X-Tina-Api-Source') != revision or

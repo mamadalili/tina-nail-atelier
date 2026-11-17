@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import stat
 import tempfile
@@ -183,6 +184,59 @@ class ReleaseSyncTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'previous release'):
                 sync.wait_for_domain(SHA, limited, timeout=0)
             self.assertFalse(sync.wait_for_domain(SHA, lambda: 'c' * 40, timeout=0))
+
+    def curl_process(self, headers, body):
+        def start(command, **kwargs):
+            self.assertNotIn('--insecure', command)
+            self.assertNotIn('--location', command)
+            self.assertEqual(command[command.index('--proto') + 1], '=https')
+            Path(command[command.index('--dump-header') + 1]).write_bytes(headers)
+            return Mock(stdout=io.BytesIO(body), communicate=Mock(return_value=(b'', b'')),
+                        returncode=0, poll=Mock(return_value=0))
+        return start
+
+    def test_host_curl_checks_php_headers_without_disabling_tls(self):
+        headers = ('HTTP/2 200\r\nX-Tina-Api-Source: ' + SHA + '\r\nX-Tina-Store-Source: ' + SHA + '\r\n\r\n').encode()
+        with patch.dict(os.environ, {'TINA_RELEASE_CURL': '1'}), patch.object(sync, 'build_opener') as urllib, \
+             patch('subprocess.Popen', side_effect=self.curl_process(headers, b'{"enabled":true}')):
+            self.assertEqual(sync.read_json(sync.SITE + '/tina-preview/api/booking.php?action=health', revision=SHA, store=True), {'enabled': True})
+            urllib.assert_not_called()
+            with self.assertRaisesRegex(ValueError, 'different release'):
+                sync.download(sync.SITE, revision='c' * 40)
+
+    def test_host_curl_bounds_content_and_checks_each_redirect(self):
+        with patch.dict(os.environ, {'TINA_RELEASE_CURL': '1'}), \
+             patch.object(sync, 'build_opener', side_effect=AssertionError('Host selected the system TLS client')):
+            for target in ('http://github.com/archive', 'https://unexpected.example/archive'):
+                headers = ('HTTP/2 302\r\nLocation: ' + target + '\r\n\r\n').encode()
+                with patch('subprocess.Popen', side_effect=self.curl_process(headers, b'')) as request:
+                    with self.assertRaisesRegex(ValueError, 'redirect'):
+                        sync.download(sync.API)
+                    self.assertEqual(request.call_count, 1)
+            with patch('subprocess.Popen', side_effect=self.curl_process(b'HTTP/2 200\r\n\r\n', b'oversized')):
+                with self.assertRaisesRegex(ValueError, 'size limit'):
+                    sync.download(sync.API, limit=4)
+            with patch('subprocess.Popen', side_effect=self.curl_process(b'HTTP/2 404\r\n\r\n', b'not published')):
+                with self.assertRaises(HTTPError) as error:
+                    sync.download(sync.API)
+                self.assertEqual(error.exception.code, 404)
+
+    def test_host_curl_follows_allowed_asset_redirect_and_uses_final_headers(self):
+        replies = iter([
+            (b'HTTP/1.1 200 Connection established\r\n\r\nHTTP/2 302\r\nLocation: https://release-assets.githubusercontent.com/salon.zip\r\n\r\n', b''),
+            (b'HTTP/2 200\r\nContent-Type: application/zip\r\n\r\n', b'verified-package'),
+        ])
+        def request(command, **kwargs):
+            return self.curl_process(*next(replies))(command, **kwargs)
+        with patch.dict(os.environ, {'TINA_RELEASE_CURL': '1'}), patch('subprocess.Popen', side_effect=request) as client:
+            self.assertEqual(sync.download('https://github.com/salon.zip'), b'verified-package')
+        self.assertEqual(client.call_args_list[-1].args[0][-1], 'https://release-assets.githubusercontent.com/salon.zip')
+
+    def test_installs_only_the_named_private_shell_runner(self):
+        self.install(package({'tina-booking-runtime/tina-run-release.sh': '#!/bin/sh\n'}), lambda _: None)
+        self.assertEqual((self.home / 'tina-booking-runtime/tina-run-release.sh').read_text(), '#!/bin/sh\n')
+        self.assertFalse(sync.is_code_path('tina-booking-runtime/other.sh'))
+        self.assertFalse(sync.is_code_path(PUBLIC + 'tina-run-release.sh'))
 
 
 if __name__ == '__main__':

@@ -31,10 +31,12 @@ The **Booking release** workflow tests the Node and PHP backends, builds both si
 On the cPanel account, add one **Cron Jobs** entry at `*/5 * * * *`. After extracting a release into Home, use this command.
 
 ```sh
-/usr/bin/python3 "$HOME/tina-booking-runtime/sync_release.py"
+/bin/sh "$HOME/tina-booking-runtime/tina-run-release.sh"
 ```
 
-The release notes also provide a one-time setup command for an existing installation that does not yet contain the updater. That command pins the initial script to the release commit and verifies its SHA-256. Both forms use the public GitHub repository over HTTPS. The hosting account runs the script from its private runtime directory without sharing hosting credentials with GitHub.
+The release notes also provide a one-time setup command for an existing installation that does not yet contain the updater. It pins both initial scripts to the release commit and verifies their SHA-256. The launcher finds the system or CloudLinux Python runtime and uses the host's cURL TLS client through `TINA_RELEASE_CURL=1`. Certificate verification, per-redirect HTTPS host restrictions and response-size limits remain enforced. The last execution is recorded in owner-only `tina-booking-runtime/release-cron.log`, outside the public directory. The hosting account uses the public GitHub repository without sharing hosting credentials with GitHub.
+
+The GitHub domain check tests the site before consulting GitHub for a superseding revision. That optional ref lookup uses the job token and cannot prevent an already healthy domain from being confirmed when the API quota is exhausted.
 
 On each update, the installer compares the current main commit, the full commit in the package, the release asset digest, and the SHA-256 recorded by a successful main workflow job. A private lock serializes installations. Existing hashed assets stay available for open browser tabs. The live check verifies the deployed PHP APIs and storage code as well as the two page versions. A failed domain check restores the previous application files and an interrupted installation recovers on the next run. The installer never copies or restores booking databases, photos in SQLite, or account credentials. Keep the normal hosting backups for those records.
 

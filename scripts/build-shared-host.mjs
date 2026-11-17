@@ -59,7 +59,7 @@ for (const endpoint of ['booking.php', 'options.php', 'receipt.php', 'metrics.ph
 const runtime = join(repo, 'deploy/shared-host/runtime');
 await cp(runtime, join(release, 'tina-booking-runtime'), {
   recursive: true,
-  filter: path => path === runtime || (dirname(path) === runtime && /^(?:[A-Z][a-zA-Z0-9]*\.php|calendar\.php|sync_release\.py)$/.test(path.split(sep).at(-1))),
+  filter: path => path === runtime || (dirname(path) === runtime && /^(?:[A-Z][a-zA-Z0-9]*\.php|calendar\.php|sync_release\.py|tina-run-release\.sh)$/.test(path.split(sep).at(-1))),
 });
 const storePath = join(release, 'tina-booking-runtime/BookingStore.php');
 const storeSource = await readFile(storePath, 'utf8');
