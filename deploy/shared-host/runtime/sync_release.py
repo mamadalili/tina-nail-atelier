@@ -204,7 +204,7 @@ def curl_response(url, limit, method):
             raise ValueError('Unexpected download redirect')
         with tempfile.TemporaryDirectory(prefix='salon-download-') as directory:
             header_file = Path(directory) / 'headers'
-            command = ['curl', '--silent', '--show-error', '--proto', '=https',
+            command = ['curl', '-q', '--silent', '--show-error', '--proto', '=https',
                        '--connect-timeout', '10', '--max-time', '50', '--max-filesize', str(limit),
                        '--dump-header', str(header_file), '--user-agent', 'Tina-Atelier-Release',
                        '--header', 'Cache-Control: no-cache']
